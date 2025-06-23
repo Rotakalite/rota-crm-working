@@ -12,7 +12,7 @@ const FOLDER_TEMPLATE = {
   }
 };
 
-// File storage utility functions - folderPath eklendi
+// File storage utility functions
 const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general', folderPath = '') => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -26,7 +26,7 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
         userId: userId,
         uploadedBy: uploadedBy,
         category: category,
-        folderPath: folderPath, // New field for folder structure
+        folderPath: folderPath,
         uploadDate: new Date().toISOString(),
         status: 'uploaded'
       };
@@ -317,7 +317,6 @@ const LoginForm = ({ onLogin }) => {
   );
 };
 
-// YENİ: Klasör Şablonu Upload Componenti
 const FolderTemplateUpload = ({ customers, onFileUpload }) => {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedFolder, setSelectedFolder] = useState('');
@@ -692,14 +691,13 @@ const FolderTemplateUpload = ({ customers, onFileUpload }) => {
   );
 };
 
-// GÜNCELLENDİ: AdminSendFile - Upload Mode Eklendi
 const AdminSendFile = ({ customers, onFileUpload }) => {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [category, setCategory] = useState('report');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadMode, setUploadMode] = useState('single'); // 'single' or 'template'
+  const [uploadMode, setUploadMode] = useState('single');
 
   const categories = [
     { id: 'report', label: '📊 Rapor', color: '#3b82f6' },
@@ -977,7 +975,6 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
   );
 };
 
-// GÜNCELLENDİ: CustomerReceivedFiles - Klasör Görünümü Eklendi
 const CustomerReceivedFiles = ({ user }) => {
   const [receivedFiles, setReceivedFiles] = useState([]);
   const [folderView, setFolderView] = useState(false);
@@ -1037,14 +1034,12 @@ const CustomerReceivedFiles = ({ user }) => {
         }
         
         if (pathParts.length > 2) {
-          // Has subfolder
           const subfolder = pathParts[1];
           if (!organized[mainFolder][subfolder]) {
             organized[mainFolder][subfolder] = [];
           }
           organized[mainFolder][subfolder].push(file);
         } else {
-          // Direct file in main folder
           if (!organized[mainFolder]['_files']) {
             organized[mainFolder]['_files'] = [];
           }
@@ -1056,7 +1051,6 @@ const CustomerReceivedFiles = ({ user }) => {
   };
 
   const templateFiles = receivedFiles.filter(f => f.category === 'template');
-  const regularFiles = receivedFiles.filter(f => f.category !== 'template');
   const organizedFiles = organizeFilesByFolder();
 
   return (
@@ -1319,23 +1313,151 @@ const CustomerReceivedFiles = ({ user }) => {
   );
 };
 
-// Diğer componentler aynı kalıyor (FileUpload, AdminDashboard, Dashboard)
-// ... (Önceki kodunuzu buraya kopyalayın, sadece yukarıdaki componentleri güncelledik)
-
+// Main App Component
 function App() {
   const [user, setUser] = useState(null);
+  const [customers] = useState([
+    { id: 'customer1', companyName: 'Örnek Otel A.Ş.', email: 'info@ornekhotel.com', stage: 2 },
+    { id: 'customer2', companyName: 'Kalite Restoran Ltd.', email: 'info@kaliterestoran.com', stage: 1 },
+    { id: 'customer3', companyName: 'Güvenlik Şirketi A.Ş.', email: 'info@guvenlik.com', stage: 3 }
+  ]);
 
-  return (
-    <div>
-      {!user ? (
-        <LoginForm onLogin={setUser} />
-      ) : user.isAdmin ? (
-        <AdminDashboard user={user} onLogout={() => setUser(null)} />
-      ) : (
-        <Dashboard user={user} onLogout={() => setUser(null)} />
-      )}
-    </div>
-  );
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+  };
+
+  // Admin Dashboard
+  if (user && user.isAdmin) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 50%, #f0f9ff 100%)',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+          color: 'white',
+          padding: '1rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'white',
+              borderRadius: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '1rem',
+              color: '#1e3a8a',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>R</div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>ROTA CRM Admin Panel</h1>
+              <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.9 }}>Müşteri Dosya Yönetim Sistemi</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span>👋 Hoş geldin, {user.name}</span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              🚪 Çıkış
+            </button>
+          </div>
+        </div>
+
+        {/* Admin Content */}
+        <div style={{ padding: '2rem' }}>
+          <AdminSendFile customers={customers} />
+        </div>
+      </div>
+    );
+  }
+
+  // Customer Dashboard
+  if (user && !user.isAdmin) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 50%, #f0f9ff 100%)',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #059669, #10b981)',
+          color: 'white',
+          padding: '1rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'white',
+              borderRadius: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '1rem',
+              color: '#059669',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>🏢</div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>{user.companyName}</h1>
+              <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.9 }}>Müşteri Portalı</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span>👋 Hoş geldin, {user.email}</span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              🚪 Çıkış
+            </button>
+          </div>
+        </div>
+
+        {/* Customer Content */}
+        <CustomerReceivedFiles user={user} />
+      </div>
+    );
+  }
+
+  // Login Screen
+  return <LoginForm onLogin={handleLogin} />;
 }
 
 export default App;
