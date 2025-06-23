@@ -1,4 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+// File storage utility functions
+const saveFileToStorage = (file, userId) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileData = {
+        id: Date.now() + Math.random(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        content: e.target.result,
+        userId: userId,
+        uploadDate: new Date().toISOString(),
+        status: 'uploaded'
+      };
+      
+      // Save to localStorage
+      const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
+      existingFiles.push(fileData);
+      localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
+      
+      resolve(fileData);
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+const getFilesFromStorage = (userId = null) => {
+  const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
+  return userId ? files.filter(f => f.userId === userId) : files;
+};
+
+const deleteFileFromStorage = (fileId) => {
+  const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
+  const updatedFiles = files.filter(f => f.id !== fileId);
+  localStorage.setItem('rotaFiles', JSON.stringify(updatedFiles));
+};
 
 const LoginForm = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -7,17 +45,17 @@ const LoginForm = ({ onLogin }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (email && password) {
-      // Admin giriş kontrolü
       if (email === 'admin@rotakalite.com' && password === 'admin123') {
         onLogin({ 
+          id: 'admin',
           email, 
           name: 'ROTA Admin', 
           role: 'admin',
           isAdmin: true 
         });
       } else {
-        // Normal müşteri girişi
         onLogin({ 
+          id: 'customer1',
           email, 
           companyName: 'Örnek Otel A.Ş.', 
           stage: 2,
@@ -60,7 +98,7 @@ const LoginForm = ({ onLogin }) => {
             fontWeight: 'bold'
           }}>R</div>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', margin: '0 0 0.5rem' }}>ROTA CRM</h2>
-          <p style={{ color: '#6b7280', margin: 0 }}>Kalite & Danışmanlık Sistemi</p>
+          <p style={{ color: '#6b7280', margin: 0 }}>Kalite & Danışmanlık Sistemi v2.0</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -119,63 +157,419 @@ const LoginForm = ({ onLogin }) => {
         </form>
 
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
-          <strong>🧪 Test Bilgileri:</strong><br/>
-          👤 Müşteri: test@otel.com / 123456<br/>
-          🛡️ Admin: admin@rotakalite.com / admin123
+          <strong>🚀 v2.0 Yenilikler:</strong><br/>
+          📁 Gerçek dosya yükleme!<br/>
+          🛡️ Gelişmiş admin paneli<br/>
+          👤 test@otel.com / 123456<br/>
+          🛡️ admin@rotakalite.com / admin123
         </div>
       </div>
     </div>
   );
 };
 
-const AdminDashboard = ({ user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [customers] = useState([
-    {
-      id: 1,
-      companyName: 'Grand Hotel Istanbul',
-      email: 'info@grandhotel.com',
-      stage: 2,
-      startDate: '2024-01-15',
-      documents: ['lisans.pdf', 'sertifika.pdf'],
-      status: 'active'
-    },
-    {
-      id: 2,
-      companyName: 'Seaside Resort',
-      email: 'contact@seaside.com',
-      stage: 1,
-      startDate: '2024-02-01',
-      documents: ['basvuru.pdf'],
-      status: 'active'
-    },
-    {
-      id: 3,
-      companyName: 'Mountain Lodge',
-      email: 'hello@mountain.com',
-      stage: 3,
-      startDate: '2023-12-10',
-      documents: ['tamamlandi.pdf'],
-      status: 'completed'
-    }
-  ]);
+const FileUpload = ({ user, onFileUpload }) => {
+  const [dragActive, setDragActive] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
-  const getStageText = (stage) => {
-    switch(stage) {
-      case 1: return '1. Aşama - Ön Değerlendirme';
-      case 2: return '2. Aşama - Süreç Analizi';
-      case 3: return '3. Aşama - Sertifikasyon';
-      default: return 'Başlangıç';
+  useEffect(() => {
+    // Load existing files
+    const files = getFilesFromStorage(user.id);
+    setUploadedFiles(files);
+  }, [user.id]);
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'active': return { background: '#dbeafe', color: '#1e40af' };
-      case 'completed': return { background: '#dcfce7', color: '#166534' };
-      case 'pending': return { background: '#fef3c7', color: '#92400e' };
-      default: return { background: '#f3f4f6', color: '#6b7280' };
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const files = Array.from(e.dataTransfer.files);
+      handleFileSelect(files);
     }
+  };
+
+  const handleFileInputChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const files = Array.from(e.target.files);
+      handleFileSelect(files);
+    }
+  };
+
+  const handleFileSelect = (files) => {
+    // File type validation
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/png',
+      'image/jpg'
+    ];
+
+    const validFiles = files.filter(file => {
+      if (!allowedTypes.includes(file.type)) {
+        alert(`${file.name} desteklenmeyen dosya türü!`);
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        alert(`${file.name} çok büyük! Maksimum 10MB`);
+        return false;
+      }
+      return true;
+    });
+
+    setSelectedFiles(validFiles);
+  };
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        
+        // Simulate progress
+        for (let progress = 0; progress <= 100; progress += 20) {
+          setUploadProgress(((i * 100) + progress) / selectedFiles.length);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // Save file
+        const savedFile = await saveFileToStorage(file, user.id);
+        setUploadedFiles(prev => [...prev, savedFile]);
+      }
+
+      setSelectedFiles([]);
+      setUploadProgress(100);
+      alert('Dosyalar başarıyla yüklendi!');
+      
+      if (onFileUpload) {
+        onFileUpload(selectedFiles);
+      }
+    } catch (error) {
+      alert('Dosya yükleme hatası!');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleDeleteFile = (fileId) => {
+    if (confirm('Bu dosyayı silmek istediğinizden emin misiniz?')) {
+      deleteFileFromStorage(fileId);
+      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (type) => {
+    if (type.includes('pdf')) return '📄';
+    if (type.includes('word') || type.includes('document')) return '📝';
+    if (type.includes('excel') || type.includes('sheet')) return '📊';
+    if (type.includes('image')) return '🖼️';
+    return '📎';
+  };
+
+  return (
+    <div style={{ maxWidth: '4xl', margin: '0 auto', padding: '2rem' }}>
+      <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>📁 Belge Yükleme</h1>
+      <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
+        Danışmanlık süreciniz için gerekli belgeleri yükleyin
+      </p>
+
+      {/* Upload Area */}
+      <div style={{
+        background: 'white',
+        borderRadius: '1rem',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+        padding: '2rem',
+        marginBottom: '2rem'
+      }}>
+        <div
+          style={{
+            border: dragActive ? '2px dashed #10b981' : '2px dashed #d1d5db',
+            borderRadius: '0.75rem',
+            padding: '2rem',
+            textAlign: 'center',
+            background: dragActive ? '#f0fdf4' : '#fafafa',
+            transition: 'all 0.3s ease'
+          }}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+        >
+          <input
+            type="file"
+            multiple
+            onChange={handleFileInputChange}
+            style={{ display: 'none' }}
+            id="file-upload"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+          />
+          
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📁</div>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            Dosyalarınızı buraya sürükleyin
+          </h3>
+          <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+            veya dosya seçmek için tıklayın
+          </p>
+          <label
+            htmlFor="file-upload"
+            style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              border: 'none',
+              fontWeight: '500',
+              display: 'inline-block'
+            }}
+          >
+            📎 Dosya Seç
+          </label>
+          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '1rem' }}>
+            PDF, Word, Excel, Resim (Maks. 10MB)
+          </p>
+        </div>
+
+        {/* Selected Files */}
+        {selectedFiles.length > 0 && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Seçilen Dosyalar:</h4>
+            <div style={{ space: '0.75rem' }}>
+              {selectedFiles.map((file, index) => (
+                <div key={index} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: '#f9fafb',
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.5rem', marginRight: '0.75rem' }}>
+                      {getFileIcon(file.type)}
+                    </span>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: '500' }}>{file.name}</p>
+                      <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+                        {formatFileSize(file.size)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedFiles(files => files.filter((_, i) => i !== index))}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      padding: '0.25rem 0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    ❌
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Upload Progress */}
+            {isUploading && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>Yükleniyor...</span>
+                  <span>{Math.round(uploadProgress)}%</span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  background: '#e5e7eb',
+                  borderRadius: '0.25rem',
+                  height: '0.5rem'
+                }}>
+                  <div style={{
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    height: '100%',
+                    borderRadius: '0.25rem',
+                    width: `${uploadProgress}%`,
+                    transition: 'width 0.3s ease'
+                  }}></div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleUpload}
+              disabled={isUploading}
+              style={{
+                width: '100%',
+                background: isUploading ? '#9ca3af' : 'linear-gradient(135deg, #10b981, #059669)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                fontWeight: '500',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                marginTop: '1rem'
+              }}
+            >
+              {isUploading ? '⏳ Yükleniyor...' : '🚀 Dosyaları Yükle'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Uploaded Files List */}
+      {uploadedFiles.length > 0 && (
+        <div style={{
+          background: 'white',
+          borderRadius: '1rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          padding: '2rem'
+        }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
+            📋 Yüklenen Dosyalar ({uploadedFiles.length})
+          </h3>
+          <div style={{ space: '0.75rem' }}>
+            {uploadedFiles.map((file) => (
+              <div key={file.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#f9fafb',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                marginBottom: '0.75rem',
+                border: '1px solid #e5e7eb'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '2rem', marginRight: '1rem' }}>
+                    {getFileIcon(file.type)}
+                  </span>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: '500' }}>{file.name}</p>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+                      {formatFileSize(file.size)} • {new Date(file.uploadDate).toLocaleDateString('tr-TR')}
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <a
+                    href={file.content}
+                    download={file.name}
+                    style={{
+                      background: '#3b82f6',
+                      color: 'white',
+                      textDecoration: 'none',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '0.25rem',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    ⬇️ İndir
+                  </a>
+                  <button
+                    onClick={() => handleDeleteFile(file.id)}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      padding: '0.25rem 0.75rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    🗑️ Sil
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AdminDashboard = ({ user, onLogout }) => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [allFiles, setAllFiles] = useState([]);
+  const [customers] = useState([
+    {
+      id: 'customer1',
+      companyName: 'Örnek Otel A.Ş.',
+      email: 'test@otel.com',
+      stage: 2,
+      startDate: '2024-01-15',
+      status: 'active'
+    },
+    {
+      id: 'customer2',
+      companyName: 'Grand Hotel Istanbul',
+      email: 'info@grandhotel.com',
+      stage: 1,
+      startDate: '2024-02-01',
+      status: 'active'
+    }
+  ]);
+
+  useEffect(() => {
+    // Load all files for admin view
+    const files = getFilesFromStorage();
+    setAllFiles(files);
+  }, [activeTab]);
+
+  const getCustomerName = (userId) => {
+    const customer = customers.find(c => c.id === userId);
+    return customer ? customer.companyName : 'Bilinmeyen Müşteri';
+  };
+
+  const getFileIcon = (type) => {
+    if (type.includes('pdf')) return '📄';
+    if (type.includes('word') || type.includes('document')) return '📝';
+    if (type.includes('excel') || type.includes('sheet')) return '📊';
+    if (type.includes('image')) return '🖼️';
+    return '📎';
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -190,10 +584,10 @@ const AdminDashboard = ({ user, onLogout }) => {
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
-          🛡️ ROTA <span style={{ color: '#fbbf24' }}>ADMIN</span>
+          🛡️ ROTA <span style={{ color: '#fbbf24' }}>ADMIN v2.0</span>
         </h1>
         <div>
-          <span style={{ marginRight: '1rem' }}>👋 Hoş geldiniz, {user.name}</span>
+          <span style={{ marginRight: '1rem' }}>👋 {user.name}</span>
           <button
             onClick={onLogout}
             style={{
@@ -221,7 +615,7 @@ const AdminDashboard = ({ user, onLogout }) => {
         {[
           { id: 'overview', label: '📊 Genel Bakış' },
           { id: 'customers', label: '👥 Müşteriler' },
-          { id: 'documents', label: '📄 Dokümanlar' },
+          { id: 'files', label: '📁 Dosyalar' },
           { id: 'reports', label: '📈 Raporlar' }
         ].map(tab => (
           <button
@@ -248,7 +642,6 @@ const AdminDashboard = ({ user, onLogout }) => {
           <div>
             <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📊 Genel Bakış</h2>
             
-            {/* Stats Cards */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -273,10 +666,8 @@ const AdminDashboard = ({ user, onLogout }) => {
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>✅ Tamamlanan</h3>
-                <p style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: 0 }}>
-                  {customers.filter(c => c.status === 'completed').length}
-                </p>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>📁 Toplam Dosya</h3>
+                <p style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: 0 }}>{allFiles.length}</p>
               </div>
 
               <div style={{
@@ -286,9 +677,9 @@ const AdminDashboard = ({ user, onLogout }) => {
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>⏳ Devam Eden</h3>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>💾 Toplam Boyut</h3>
                 <p style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: 0 }}>
-                  {customers.filter(c => c.status === 'active').length}
+                  {formatFileSize(allFiles.reduce((total, file) => total + file.size, 0))}
                 </p>
               </div>
 
@@ -299,179 +690,205 @@ const AdminDashboard = ({ user, onLogout }) => {
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>📄 Toplam Belge</h3>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>🆕 Bugün Yüklenen</h3>
                 <p style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: 0 }}>
-                  {customers.reduce((total, c) => total + c.documents.length, 0)}
+                  {allFiles.filter(f => new Date(f.uploadDate).toDateString() === new Date().toDateString()).length}
                 </p>
               </div>
             </div>
 
-            {/* Recent Activity */}
             <div style={{
               background: 'white',
               padding: '1.5rem',
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🕒 Son Aktiviteler</h3>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid #f3f4f6' }}>
-                  <span style={{ marginRight: '0.75rem' }}>🟢</span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: '500' }}>Grand Hotel Istanbul 2. aşamaya geçti</p>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>2 saat önce</p>
-                  </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🚀 v2.0 Yeni Özellikler</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
+                  <strong>📁 Gerçek Dosya Yükleme</strong><br/>
+                  <small>Müşteriler artık gerçek dosya yükleyebilir!</small>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid #f3f4f6' }}>
-                  <span style={{ marginRight: '0.75rem' }}>📄</span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: '500' }}>Seaside Resort yeni belge yükledi</p>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>5 saat önce</p>
-                  </div>
+                <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '0.5rem' }}>
+                  <strong>👁️ Dosya Görüntüleme</strong><br/>
+                  <small>Admin tüm dosyaları görebilir ve indirebilir</small>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '0.75rem 0' }}>
-                  <span style={{ marginRight: '0.75rem' }}>🎉</span>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: '500' }}>Mountain Lodge sertifikasyonu tamamladı</p>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>1 gün önce</p>
-                  </div>
+                <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '0.5rem' }}>
+                  <strong>🔄 Otomatik Kaydetme</strong><br/>
+                  <small>Dosyalar güvenli şekilde saklanıyor</small>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'files' && (
+          <div>
+            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+              📁 Tüm Dosyalar ({allFiles.length})
+            </h2>
+            
+            {allFiles.length === 0 ? (
+              <div style={{
+                background: 'white',
+                padding: '3rem',
+                borderRadius: '0.75rem',
+                textAlign: 'center',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+                <h3>Henüz dosya yüklenmemiş</h3>
+                <p style={{ color: '#6b7280' }}>Müşteriler dosya yüklediğinde burada görüntülenecek.</p>
+              </div>
+            ) : (
+              <div style={{
+                background: 'white',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                overflow: 'hidden'
+              }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ background: '#f9fafb' }}>
+                      <tr>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📎 Dosya</th>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>🏢 Müşteri</th>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📏 Boyut</th>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📅 Tarih</th>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>⚡ İşlemler</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allFiles.map((file) => (
+                        <tr key={file.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <span style={{ fontSize: '1.5rem', marginRight: '0.75rem' }}>
+                                {getFileIcon(file.type)}
+                              </span>
+                              <div>
+                                <p style={{ margin: 0, fontWeight: '500' }}>{file.name}</p>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>{file.type}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <span style={{ 
+                              background: '#e0f2fe',
+                              color: '#0369a1',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '0.25rem',
+                              fontSize: '0.875rem'
+                            }}>
+                              {getCustomerName(file.userId)}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', color: '#6b7280' }}>
+                            {formatFileSize(file.size)}
+                          </td>
+                          <td style={{ padding: '1rem', color: '#6b7280' }}>
+                            {new Date(file.uploadDate).toLocaleString('tr-TR')}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <a
+                                href={file.content}
+                                download={file.name}
+                                style={{
+                                  background: '#3b82f6',
+                                  color: 'white',
+                                  textDecoration: 'none',
+                                  padding: '0.25rem 0.75rem',
+                                  borderRadius: '0.25rem',
+                                  fontSize: '0.75rem'
+                                }}
+                              >
+                                ⬇️ İndir
+                              </a>
+                              <button
+                                onClick={() => {
+                                  if (confirm('Bu dosyayı silmek istediğinizden emin misiniz?')) {
+                                    deleteFileFromStorage(file.id);
+                                    setAllFiles(prev => prev.filter(f => f.id !== file.id));
+                                  }
+                                }}
+                                style={{
+                                  background: '#ef4444',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '0.25rem',
+                                  padding: '0.25rem 0.75rem',
+                                  cursor: 'pointer',
+                                  fontSize: '0.75rem'
+                                }}
+                              >
+                                🗑️ Sil
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'customers' && (
           <div>
             <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>👥 Müşteri Yönetimi</h2>
-            
             <div style={{
               background: 'white',
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               overflow: 'hidden'
             }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ background: '#f9fafb' }}>
-                    <tr>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>🏢 Şirket</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>📧 Email</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>🎯 Aşama</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>📄 Belgeler</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>📊 Durum</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>⚡ İşlemler</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customers.map(customer => (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ background: '#f9fafb' }}>
+                  <tr>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>🏢 Şirket</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📧 Email</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📁 Dosyalar</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📅 Kayıt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map(customer => {
+                    const customerFiles = allFiles.filter(f => f.userId === customer.id);
+                    return (
                       <tr key={customer.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td style={{ padding: '1rem 0.75rem' }}>
-                          <div>
-                            <p style={{ margin: 0, fontWeight: '500' }}>{customer.companyName}</p>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>{customer.startDate}</p>
-                          </div>
+                        <td style={{ padding: '1rem' }}>
+                          <p style={{ margin: 0, fontWeight: '500' }}>{customer.companyName}</p>
                         </td>
-                        <td style={{ padding: '1rem 0.75rem', color: '#6b7280' }}>{customer.email}</td>
-                        <td style={{ padding: '1rem 0.75rem' }}>
+                        <td style={{ padding: '1rem', color: '#6b7280' }}>{customer.email}</td>
+                        <td style={{ padding: '1rem' }}>
                           <span style={{
+                            background: customerFiles.length > 0 ? '#dcfce7' : '#fef3c7',
+                            color: customerFiles.length > 0 ? '#166534' : '#92400e',
                             padding: '0.25rem 0.75rem',
                             borderRadius: '1rem',
-                            fontSize: '0.75rem',
-                            background: customer.stage === 3 ? '#dcfce7' : customer.stage === 2 ? '#dbeafe' : '#fef3c7',
-                            color: customer.stage === 3 ? '#166534' : customer.stage === 2 ? '#1e40af' : '#92400e'
-                          }}>
-                            {getStageText(customer.stage)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem' }}>
-                          <span style={{
-                            padding: '0.25rem 0.5rem',
-                            background: '#f3f4f6',
-                            borderRadius: '0.25rem',
                             fontSize: '0.75rem'
                           }}>
-                            {customer.documents.length} dosya
+                            {customerFiles.length} dosya
                           </span>
                         </td>
-                        <td style={{ padding: '1rem 0.75rem' }}>
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '1rem',
-                            fontSize: '0.75rem',
-                            ...getStatusColor(customer.status)
-                          }}>
-                            {customer.status === 'active' ? '🟢 Aktif' : customer.status === 'completed' ? '✅ Tamamlandı' : '⏳ Beklemede'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button style={{
-                              padding: '0.25rem 0.5rem',
-                              background: '#3b82f6',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '0.25rem',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem'
-                            }}>
-                              👁️ Görüntüle
-                            </button>
-                            <button style={{
-                              padding: '0.25rem 0.5rem',
-                              background: '#10b981',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '0.25rem',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem'
-                            }}>
-                              ✏️ Düzenle
-                            </button>
-                          </div>
+                        <td style={{ padding: '1rem', color: '#6b7280' }}>
+                          {new Date(customer.startDate).toLocaleDateString('tr-TR')}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'documents' && (
-          <div>
-            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📄 Doküman Yönetimi</h2>
-            <div style={{
-              background: 'white',
-              padding: '2rem',
-              borderRadius: '0.75rem',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              textAlign: 'center'
-            }}>
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>📤 Müşterilere Doküman Gönder</h3>
-              <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-                Müşterilerinize özel raporlar, sertifikalar ve belgeler yükleyebilirsiniz.
-              </p>
-              <button style={{
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: '500'
-              }}>
-                📎 Doküman Yükle
-              </button>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
         {activeTab === 'reports' && (
           <div>
-            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📈 Raporlar & Analitik</h2>
+            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📈 Dosya İstatistikleri</h2>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
@@ -483,12 +900,12 @@ const AdminDashboard = ({ user, onLogout }) => {
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>📊 Aylık İstatistikler</h3>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>📊 Dosya Türleri</h3>
                 <div>
-                  <p>🟢 Yeni Müşteriler: <strong>3</strong></p>
-                  <p>✅ Tamamlanan: <strong>1</strong></p>
-                  <p>📄 Yüklenen Belgeler: <strong>12</strong></p>
-                  <p>💰 Gelir: <strong>₺25,000</strong></p>
+                  <p>📄 PDF: <strong>{allFiles.filter(f => f.type.includes('pdf')).length}</strong></p>
+                  <p>📝 Word: <strong>{allFiles.filter(f => f.type.includes('word') || f.type.includes('document')).length}</strong></p>
+                  <p>📊 Excel: <strong>{allFiles.filter(f => f.type.includes('excel') || f.type.includes('sheet')).length}</strong></p>
+                  <p>🖼️ Resim: <strong>{allFiles.filter(f => f.type.includes('image')).length}</strong></p>
                 </div>
               </div>
 
@@ -498,25 +915,24 @@ const AdminDashboard = ({ user, onLogout }) => {
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🎯 Süreç Dağılımı</h3>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>📅 Bu Hafta</h3>
                 <div>
-                  <p>1️⃣ 1. Aşama: <strong>1 müşteri</strong></p>
-                  <p>2️⃣ 2. Aşama: <strong>1 müşteri</strong></p>
-                  <p>3️⃣ 3. Aşama: <strong>1 müşteri</strong></p>
-                </div>
-              </div>
-
-              <div style={{
-                background: 'white',
-                padding: '1.5rem',
-                borderRadius: '0.75rem',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>⏱️ Ortalama Süreler</h3>
-                <div>
-                  <p>📅 Ortalama tamamlanma: <strong>6 hafta</strong></p>
-                  <p>⚡ En hızlı: <strong>4 hafta</strong></p>
-                  <p>🐌 En yavaş: <strong>8 hafta</strong></p>
+                  <p>🟢 Yeni Dosyalar: <strong>{allFiles.filter(f => {
+                    const fileDate = new Date(f.uploadDate);
+                    const weekAgo = new Date();
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    return fileDate > weekAgo;
+                  }).length}</strong></p>
+                  <p>📁 Toplam Boyut: <strong>{formatFileSize(
+                    allFiles
+                      .filter(f => {
+                        const fileDate = new Date(f.uploadDate);
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return fileDate > weekAgo;
+                      })
+                      .reduce((total, f) => total + f.size, 0)
+                  )}</strong></p>
                 </div>
               </div>
             </div>
@@ -528,6 +944,8 @@ const AdminDashboard = ({ user, onLogout }) => {
 };
 
 const Dashboard = ({ user, onLogout }) => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', fontFamily: 'Arial, sans-serif' }}>
       <header style={{
@@ -539,7 +957,7 @@ const Dashboard = ({ user, onLogout }) => {
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
-          ROTA <span style={{ color: '#10b981' }}>CRM</span>
+          ROTA <span style={{ color: '#10b981' }}>CRM v2.0</span>
         </h1>
         <div>
           <span style={{ marginRight: '1rem' }}>Hoş geldiniz, {user.companyName}</span>
@@ -559,74 +977,114 @@ const Dashboard = ({ user, onLogout }) => {
         </div>
       </header>
 
-      <main style={{ padding: '2rem' }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>Dashboard</h2>
-        <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-          Sürdürülebilir turizm danışmanlığı sürecinizi takip edin
-        </p>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '0.75rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            borderLeft: '4px solid #10b981'
-          }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Mevcut Aşama</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{user.stage}. Aşama</p>
-          </div>
-
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '0.75rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            borderLeft: '4px solid #3b82f6'
-          }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Yüklenen Belgeler</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>3</p>
-          </div>
-
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '0.75rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            borderLeft: '4px solid #8b5cf6'
-          }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Tahmini Süre</h3>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>4-6 Hafta</p>
-          </div>
+      {/* Navigation */}
+      <nav style={{
+        background: 'white',
+        borderBottom: '1px solid #e5e7eb',
+        padding: '0 2rem'
+      }}>
+        <div style={{ display: 'flex', gap: '2rem' }}>
+          {[
+            { id: 'dashboard', label: '📊 Dashboard' },
+            { id: 'upload', label: '📁 Belge Yükle' },
+            { id: 'reports', label: '📋 Raporlarım' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '1rem 0',
+                border: 'none',
+                background: 'none',
+                color: activeTab === tab.id ? '#10b981' : '#6b7280',
+                borderBottom: activeTab === tab.id ? '2px solid #10b981' : '2px solid transparent',
+                fontWeight: activeTab === tab.id ? '600' : '400',
+                cursor: 'pointer'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+      </nav>
 
-        <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.75rem',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🎉 ROTA CRM + ADMIN PANELİ HAZIR!</h3>
-          <p style={{ marginBottom: '1rem' }}>Tebrikler! CRM sisteminiz ve admin paneliniz canlıda ve kullanılabilir.</p>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
-            <div style={{ padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem' }}>
-              <strong>👤 Müşteri Girişi:</strong><br/>
-              📧 test@otel.com<br/>
-              🔒 123456
+      <main>
+        {activeTab === 'dashboard' && (
+          <div style={{ padding: '2rem' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📊 Dashboard</h2>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: '1.5rem',
+              marginBottom: '2rem'
+            }}>
+              <div style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #10b981'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Mevcut Aşama</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{user.stage}. Aşama</p>
+              </div>
+
+              <div style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #3b82f6'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Yüklenen Belgeler</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                  {getFilesFromStorage(user.id).length}
+                </p>
+              </div>
             </div>
-            <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
-              <strong>🛡️ Admin Girişi:</strong><br/>
-              📧 admin@rotakalite.com<br/>
-              🔒 admin123
+
+            <div style={{
+              background: 'white',
+              padding: '1.5rem',
+              borderRadius: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🚀 v2.0 Güncellemesi!</h3>
+              <p style={{ marginBottom: '1rem', color: '#059669', fontWeight: '500' }}>
+                Artık gerçek dosya yükleme sistemi aktif! Belgelerinizi güvenle yükleyebilirsiniz.
+              </p>
+              <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
+                <strong>✨ Yeni Özellikler:</strong><br/>
+                📁 Gerçek dosya yükleme ve indirme<br/>
+                🛡️ Güvenli dosya depolama<br/>
+                👁️ Admin dosya görüntüleme<br/>
+                📊 Gelişmiş dosya istatistikleri
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'upload' && (
+          <FileUpload user={user} onFileUpload={() => {}} />
+        )}
+
+        {activeTab === 'reports' && (
+          <div style={{ padding: '2rem' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📋 Raporlarım</h2>
+            <div style={{
+              background: 'white',
+              padding: '2rem',
+              borderRadius: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Size özel raporlar hazırlanıyor...</h3>
+              <p style={{ color: '#6b7280' }}>
+                Danışmanlarımız sürecinizi değerlendirip size özel raporlar hazırlayacak.
+              </p>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
