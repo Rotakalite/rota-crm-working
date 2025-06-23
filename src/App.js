@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import "./App.css";
 
 // Folder template structure
 const FOLDER_TEMPLATE = {
@@ -1314,5 +1315,153 @@ const CustomerReceivedFiles = ({ user }) => {
   );
 };
 
-// Resterek kod aynı kalmaya devam ediyor...
-// [Dosyanın geri kalanı önceki haliyle aynı]
+// Main App Component
+function App() {
+  const [user, setUser] = useState(null);
+  const [customers] = useState([
+    { id: 'customer1', companyName: 'Örnek Otel A.Ş.', email: 'info@ornekhotel.com', stage: 2 },
+    { id: 'customer2', companyName: 'Kalite Restoran Ltd.', email: 'info@kaliterestoran.com', stage: 1 },
+    { id: 'customer3', companyName: 'Güvenlik Şirketi A.Ş.', email: 'info@guvenlik.com', stage: 3 }
+  ]);
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+  };
+
+  // Admin Dashboard
+  if (user && user.isAdmin) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 50%, #f0f9ff 100%)',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+          color: 'white',
+          padding: '1rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'white',
+              borderRadius: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '1rem',
+              color: '#1e3a8a',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>R</div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>ROTA CRM Admin Panel</h1>
+              <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.9 }}>Müşteri Dosya Yönetim Sistemi</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span>👋 Hoş geldin, {user.name}</span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              🚪 Çıkış
+            </button>
+          </div>
+        </div>
+
+        {/* Admin Content */}
+        <div style={{ padding: '2rem' }}>
+          <AdminSendFile customers={customers} />
+        </div>
+      </div>
+    );
+  }
+
+  // Customer Dashboard
+  if (user && !user.isAdmin) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 50%, #f0f9ff 100%)',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #059669, #10b981)',
+          color: 'white',
+          padding: '1rem 2rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'white',
+              borderRadius: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '1rem',
+              color: '#059669',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>🏢</div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>{user.companyName}</h1>
+              <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.9 }}>Müşteri Portalı</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span>👋 Hoş geldin, {user.email}</span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              🚪 Çıkış
+            </button>
+          </div>
+        </div>
+
+        {/* Customer Content */}
+        <CustomerReceivedFiles user={user} />
+      </div>
+    );
+  }
+
+  // Login Screen
+  return <LoginForm onLogin={handleLogin} />;
+}
+
+export default App;
+
+
