@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-const FOLDER_TEMPLATE = {
-  'A SÜTUNU': ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7.1', 'A7.2', 'A7.3', 'A7.4', 'A8', 'A9', 'A10'],
-  'B SÜTUNU': ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9'],
-  'C SÜTUNU': ['C1', 'C2', 'C3', 'C4'],
-  'D SÜTUNU': {
-    'D1': ['D1.1', 'D1.2', 'D1.3', 'D1.4'], 
-    'D2': ['D2.1', 'D2.2', 'D2.3', 'D2.4', 'D2.5', 'D2.6'], 
-    'D3': ['D3.1', 'D3.2', 'D3.3', 'D3.4', 'D3.5', 'D3.6']
-  }
-};
+import './App.css';
 
 const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general', folderPath = '') => {
   return new Promise((resolve) => {
@@ -21,7 +11,7 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
         size: file.size,
         type: file.type,
         content: e.target.result,
-        userId: userId,
+        userId,
         uploadedBy,
         category,
         folderPath,
@@ -40,79 +30,34 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
 const getFilesFromStorage = (userId = null, uploadedBy = null) => {
   const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
   let filteredFiles = files;
-  if (userId) {
-    filteredFiles = filteredFiles.filter((f) => f.userId === userId);
-  }
-  if (uploadedBy) {
-    filteredFiles = filteredFiles.filter((f) => f.uploadedBy === uploadedBy);
-  }
+  if (userId) filteredFiles = filteredFiles.filter((f) => f.userId === userId);
+  if (uploadedBy) filteredFiles = filteredFiles.filter((f) => f.uploadedBy === uploadedBy);
   return filteredFiles;
 };
 
-const deleteFileFromStorage = (fileId) => {
-  const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
-  const updatedFiles = files.filter((f) => f.id !== fileId);
-  localStorage.setItem('rotaFiles', JSON.stringify(updatedFiles));
-};
+const AdminLogin = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-function App() {
-  const [user, setUser] = useState(null);
-  const [customers, setCustomers] = useState([
-    { id: 'customer1', companyName: 'Örnek Otel A.Ş.', email: 'info@ornekhotel.com', stage: 2 },
-    { id: 'customer2', companyName: 'Kalite Restoran Ltd.', email: 'info@kaliterestoran.com', stage: 1 },
-    { id: 'customer3', companyName: 'Güvenlik Şirketi A.Ş.', email: 'info@guvenlik.com', stage: 3 },
-  ]);
+  const admins = [{ email: 'admin@rotakalite.com', password: 'admin123', name: 'Rota Admin' }];
 
-  const handleLogin = (userData) => {
-    setUser(userData);
-  };
-  const handleLogout = () => {
-    setUser(null);
+  const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const admin = admins.find((a) => a.email === email && a.password === password);
+    if (admin) {
+      onLogin({ id: 'admin', email, name: admin.name, role: 'admin', isAdmin: true });
+      return;
+    }
+    const customer = customers.find((c) => c.email === email && c.password === password);
+    if (customer) {
+      onLogin({ ...customer, role: 'customer', isAdmin: false });
+      return;
+    }
+    alert('Hatalı e-mail veya şifre!');
   };
   
-  // Eğer Admin ise
-  if (user && user.isAdmin) {
-    return (
-      <div style={{ fontFamily: ' Arial, sans-serif' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
-          color: 'white',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-        }}>
-          <div>Rota CRM Admin Panel</div>
-          <div>👋 {user.name} <button onClick={handleLogout}>Çıkış</button></div>
-        </div>
-        <div style={{ padding: '2rem' }}>
-          <h2>Hoş Geldin, Admin!</h2>
-        </div>
-      </div>
-    );
-  }
-
-  // Eğer Müşteri ise
-  if (user && !user.isAdmin) {
-    return (
-      <div style={{ fontFamily: ' Arial, sans-serif' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, #059669, #10b981)',
-          color: 'white',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-        }}>
-          <div>{user.companyName}</div>
-          <div>👋 {user.email} <button onClick={handleLogout}>Çıkış</button></div>
-        </div>
-        <div style={{ padding: '2rem' }}>
-          <h2>Hoş Geldin, {user.companyName}</h2>
-        </div>
-      </div>
-    );
-  }
-
-  // Eğer Giriş Yapmamışsa
   return (
     <div style={{
       minHeight: '100vh',
@@ -128,27 +73,160 @@ function App() {
         borderRadius: '1rem',
         textAlign: 'center',
       }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: 'bold' }}>ROTA CRM</h2>
-        <p>Hoş geldin! Lütfen giriş yap veya şifre sıfırla.</p>
-        <button
-          style={{
-            padding: '1rem 2rem',
-            fontSize: '1rem',
+        <h2>Giriş Yap</h2>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <input 
+              type="email"
+              placeholder="E-mail"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={{ padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db' }}
+            />
+          </div>
+          
+          <div style={{ marginBottom: '1rem' }}>
+            <input 
+              type="password"
+              placeholder="Şifre"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{ padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #d1d5db' }}
+            />
+          </div>
+
+          <button style={{
+            padding: '0.75rem 2rem',
             background: 'linear-gradient(135deg, #10b981, #059669)',
             color: 'white',
             border: 'none',
             borderRadius: '0.5rem',
             cursor: 'pointer',
             fontWeight: '600',
+            fontSize: '1rem',
             marginTop: '1rem',
-          }}
-        >
-          Giriş
-        </button>
+            display: 'block',
+            width: '100%',
+          }}>Giriş</button>
+        </form>
       </div>
     </div>
   );
+};
+
+const AdminPanel = ({ customers, onLogout, refreshCustomers }) => {
+  const handleEditPrice = (customerId, price) => {
+    const updatedCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
+    const index = updatedCustomers.findIndex((c) => c.id === customerId);
+    if (index !== -1) {
+      updatedCustomers[index].price = price;
+      localStorage.setItem('customers', JSON.stringify(updatedCustomers));
+      refreshCustomers();
+    }
+  };
+  
+  return (
+    <div style={{ fontFamily: ' Arial, sans-serif' }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+        color: 'white',
+        padding: '1rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+      }}>
+        <div>Rota CRM Admin Panel</div>
+        <div><button onClick={onLogout}>Çıkış</button></div>
+      </div>
+      <div style={{ padding: '2rem' }}>
+        <h2>Hoş Geldin, Admin!</h2>
+        <div>
+          {customers.map((customer) => (
+            <div key={customer.id} style={{ marginBottom: '1rem' }}>
+              <strong>{customer.companyName}</strong> ({customer.email})
+              <div>Fiyat: {customer.price ? customer.price : 'Belirlenmemiş'}</div>
+              <input
+                placeholder="Fiyat gir..."
+                style={{ marginRight: '0.5rem' }}
+                onChange={(e) => customer.newPrice = e.target.value}
+              />
+              <button onClick={() => handleEditPrice(customer.id, customer.newPrice)}>Fiyatı Güncelle</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CustomerPanel = ({ user, onLogout }) => {
+  const [files, setFiles] = useState(getFilesFromStorage(user.id));
+
+  const handleUpload = async (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    for (const file of selectedFiles) {
+      await saveFileToStorage(file, user.id, 'customer');
+    }
+    setFiles(getFilesFromStorage(user.id));
+  };
+  
+  return (
+    <div style={{ fontFamily: ' Arial, sans-serif' }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #059669, #10b981)',
+        color: 'white',
+        padding: '1rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+      }}>
+        <div>{user.companyName}</div>
+        <div>{user.email} <button onClick={onLogout}>Çıkış</button></div>
+      </div>
+      <div style={{ padding: '2rem' }}>
+        <h2>Hoş Geldin, {user.companyName}</h2>
+        <input
+          type="file"
+          multiple
+          onChange={handleUpload}
+        />
+        <div>
+          <h3>Yüklenen Dosyalar:</h3>
+          {files.map((f) => (
+            <div key={f.id}>{f.name}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [customers, setCustomers] = useState(() => {
+    return JSON.parse(localStorage.getItem('customers') || '[]');
+  });
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+  
+  const handleLogout = () => {
+    setUser(null);
+  };
+  
+  const refreshCustomers = () => {
+    setCustomers(JSON.parse(localStorage.getItem('customers') || '[]'));
+  };
+  
+  if (user && user.isAdmin) {
+    return <AdminPanel customers={customers} onLogout={handleLogout} refreshCustomers={refreshCustomers} />;
+  }
+  if (user && !user.isAdmin) {
+    return <CustomerPanel user={user} onLogout={handleLogout} />;
+  }
+  
+  return <AdminLogin onLogin={handleLogin} />;
 }
 
 export default App;
-
