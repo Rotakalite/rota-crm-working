@@ -1773,4 +1773,305 @@ const AdminDashboard = ({ user, onLogout }) => {
                               >
                                 🗑️ Sil
                               </button>
-     <response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'customers' && (
+          <div>
+            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>👥 Müşteri Yönetimi</h2>
+            <div style={{
+              background: 'white',
+              borderRadius: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              overflow: 'hidden'
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ background: '#f9fafb' }}>
+                  <tr>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>🏢 Şirket</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📧 Email</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📁 Dosyalar</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📤 Gönderilenler</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>🗂️ Klasörler</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📅 Kayıt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map(customer => {
+                    const customerFiles = allFiles.filter(f => f.userId === customer.id && f.uploadedBy === 'customer');
+                    const sentFiles = allFiles.filter(f => f.userId === customer.id && f.uploadedBy === 'admin');
+                    const customerFolders = allFolders.filter(f => f.userId === customer.id);
+                    return (
+                      <tr key={customer.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '1rem' }}>
+                          <p style={{ margin: 0, fontWeight: '500' }}>{customer.companyName}</p>
+                        </td>
+                        <td style={{ padding: '1rem', color: '#6b7280' }}>{customer.email}</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            background: customerFiles.length > 0 ? '#dcfce7' : '#fef3c7',
+                            color: customerFiles.length > 0 ? '#166534' : '#92400e',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '1rem',
+                            fontSize: '0.75rem'
+                          }}>
+                            📥 {customerFiles.length} dosya
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            background: sentFiles.length > 0 ? '#eff6ff' : '#f3f4f6',
+                            color: sentFiles.length > 0 ? '#1e40af' : '#6b7280',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '1rem',
+                            fontSize: '0.75rem'
+                          }}>
+                            📤 {sentFiles.length} gönderildi
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            background: customerFolders.length > 0 ? '#fef3c7' : '#f3f4f6',
+                            color: customerFolders.length > 0 ? '#92400e' : '#6b7280',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '1rem',
+                            fontSize: '0.75rem'
+                          }}>
+                            📁 {customerFolders.length} klasör
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', color: '#6b7280' }}>
+                          {new Date(customer.startDate).toLocaleDateString('tr-TR')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+const Dashboard = ({ user, onLogout }) => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Kullanıcı giriş yaptığında Sürdürülebilir Turizm klasör sistemini oluştur
+  useEffect(() => {
+    createSustainableTourismFolders(user.id);
+  }, [user.id]);
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f9fafb', fontFamily: 'Arial, sans-serif' }}>
+      <header style={{
+        background: 'white',
+        padding: '1rem 2rem',
+        borderBottom: '1px solid #e5e7eb',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
+          ROTA <span style={{ color: '#10b981' }}>CRM v2.3</span>
+        </h1>
+        <div>
+          <span style={{ marginRight: '1rem' }}>Hoş geldiniz, {user.companyName}</span>
+          <button
+            onClick={onLogout}
+            style={{
+              background: '#dc2626',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
+          >
+            Çıkış
+          </button>
+        </div>
+      </header>
+
+      {/* Navigation */}
+      <nav style={{
+        background: 'white',
+        borderBottom: '1px solid #e5e7eb',
+        padding: '0 2rem'
+      }}>
+        <div style={{ display: 'flex', gap: '2rem' }}>
+          {[
+            { id: 'dashboard', label: '📊 Dashboard' },
+            { id: 'upload', label: '📁 Belge Yükle' },
+            { id: 'received', label: '📥 Size Özel Belgeler' },
+            { id: 'reports', label: '📋 Raporlarım' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '1rem 0',
+                border: 'none',
+                background: 'none',
+                color: activeTab === tab.id ? '#10b981' : '#6b7280',
+                borderBottom: activeTab === tab.id ? '2px solid #10b981' : '2px solid transparent',
+                fontWeight: activeTab === tab.id ? '600' : '400',
+                cursor: 'pointer'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <main>
+        {activeTab === 'dashboard' && (
+          <div style={{ padding: '2rem' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📊 Dashboard</h2>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: '1.5rem',
+              marginBottom: '2rem'
+            }}>
+              <div style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #10b981'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Mevcut Aşama</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>{user.stage}. Aşama</p>
+              </div>
+
+              <div style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #3b82f6'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Yüklediğiniz Belgeler</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                  {getFilesFromStorage(user.id, 'customer').length}
+                </p>
+              </div>
+
+              <div style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #f59e0b'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Size Özel Belgeler</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                  {getFilesFromStorage(user.id, 'admin').length}
+                </p>
+              </div>
+
+              <div style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #8b5cf6'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Klasörleriniz</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                  {getFoldersFromStorage(user.id).length}
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'white',
+              padding: '1.5rem',
+              borderRadius: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🎉 v2.3 SÜPER GÜNCELLEME!</h3>
+              <p style={{ marginBottom: '1rem', color: '#059669', fontWeight: '500' }}>
+                🌿 Sürdürülebilir Turizm Yönetim Sistemi otomatik olarak oluşturuldu!
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
+                  <strong>🌿 Sürdürülebilir Turizm</strong><br/>
+                  <small>A, B, C, D sütunları ile organize sistem!</small>
+                </div>
+                <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '0.5rem' }}>
+                  <strong>📁 Otomatik Klasörler</strong><br/>
+                  <small>Sistem kurulumunda otomatik oluşturulur!</small>
+                </div>
+                <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '0.5rem' }}>
+                  <strong>🔄 Hiyerarşik Yapı</strong><br/>
+                  <small>D sütunu alt klasörleri ile detaylı!</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'upload' && (
+          <FileUpload user={user} onFileUpload={() => {}} />
+        )}
+
+        {activeTab === 'received' && (
+          <CustomerReceivedFiles user={user} />
+        )}
+
+        {activeTab === 'reports' && (
+          <div style={{ padding: '2rem' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📋 Raporlarım</h2>
+            <div style={{
+              background: 'white',
+              padding: '2rem',
+              borderRadius: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Size özel raporlar hazırlanıyor...</h3>
+              <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
+                Danışmanlarımız sürecinizi değerlendirip size özel raporlar hazırlayacak.
+              </p>
+              <div style={{ padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem' }}>
+                <strong>💡 İpucu:</strong> Size özel belgeler "Size Özel Belgeler" sekmesinde görüntülenir!
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+function App() {
+  const [user, setUser] = useState(null);
+
+  return (
+    <div>
+      {!user ? (
+        <LoginForm onLogin={setUser} />
+      ) : user.isAdmin ? (
+        <AdminDashboard user={user} onLogout={() => setUser(null)} />
+      ) : (
+        <Dashboard user={user} onLogout={() => setUser(null)} />
+      )}
+    </div>
+  );
+}
+
+export default App;
