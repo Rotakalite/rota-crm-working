@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // File storage utility functions
-const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general') => {
+const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general', folderId = null) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -14,6 +14,7 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
         userId: userId,
         uploadedBy: uploadedBy, // 'customer' or 'admin'
         category: category, // 'general', 'report', 'certificate', 'form'
+        folderId: folderId, // NEW: Klasör ID'si
         uploadDate: new Date().toISOString(),
         status: 'uploaded'
       };
@@ -28,7 +29,7 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
   });
 };
 
-const getFilesFromStorage = (userId = null, uploadedBy = null) => {
+const getFilesFromStorage = (userId = null, uploadedBy = null, folderId = null) => {
   const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
   let filteredFiles = files;
   
@@ -39,6 +40,10 @@ const getFilesFromStorage = (userId = null, uploadedBy = null) => {
   if (uploadedBy) {
     filteredFiles = filteredFiles.filter(f => f.uploadedBy === uploadedBy);
   }
+
+  if (folderId !== null) {
+    filteredFiles = filteredFiles.filter(f => f.folderId === folderId);
+  }
   
   return filteredFiles;
 };
@@ -46,6 +51,50 @@ const getFilesFromStorage = (userId = null, uploadedBy = null) => {
 const deleteFileFromStorage = (fileId) => {
   const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
   const updatedFiles = files.filter(f => f.id !== fileId);
+  localStorage.setItem('rotaFiles', JSON.stringify(updatedFiles));
+};
+
+// NEW: Klasör yönetimi fonksiyonları
+const saveFolderToStorage = (folderName, userId, parentId = null) => {
+  const folderData = {
+    id: Date.now() + Math.random(),
+    name: folderName,
+    userId: userId,
+    parentId: parentId,
+    createdDate: new Date().toISOString(),
+    type: 'folder'
+  };
+  
+  const existingFolders = JSON.parse(localStorage.getItem('rotaFolders') || '[]');
+  existingFolders.push(folderData);
+  localStorage.setItem('rotaFolders', JSON.stringify(existingFolders));
+  
+  return folderData;
+};
+
+const getFoldersFromStorage = (userId = null, parentId = null) => {
+  const folders = JSON.parse(localStorage.getItem('rotaFolders') || '[]');
+  let filteredFolders = folders;
+  
+  if (userId) {
+    filteredFolders = filteredFolders.filter(f => f.userId === userId);
+  }
+  
+  if (parentId !== undefined) {
+    filteredFolders = filteredFolders.filter(f => f.parentId === parentId);
+  }
+  
+  return filteredFolders;
+};
+
+const deleteFolderFromStorage = (folderId) => {
+  const folders = JSON.parse(localStorage.getItem('rotaFolders') || '[]');
+  const updatedFolders = folders.filter(f => f.id !== folderId);
+  localStorage.setItem('rotaFolders', JSON.stringify(updatedFolders));
+  
+  // Klasördeki dosyaları da sil
+  const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
+  const updatedFiles = files.filter(f => f.folderId !== folderId);
   localStorage.setItem('rotaFiles', JSON.stringify(updatedFiles));
 };
 
@@ -109,7 +158,7 @@ const LoginForm = ({ onLogin }) => {
             fontWeight: 'bold'
           }}>R</div>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', margin: '0 0 0.5rem' }}>ROTA CRM</h2>
-          <p style={{ color: '#6b7280', margin: 0 }}>v2.1 - Admin Dosya Gönderimi!</p>
+          <p style={{ color: '#6b7280', margin: 0 }}>v2.2 - ZIP + Klasör Sistemi! 🎉</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -168,9 +217,11 @@ const LoginForm = ({ onLogin }) => {
         </form>
 
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
-          <strong>🚀 v2.1 BOMBA Özellik:</strong><br/>
-          📤 Admin müşterilere dosya gönderebilir!<br/>
-          📥 Müşteriler admin dosyalarını görür!<br/>
+          <strong>🚀 v2.2 YENİ ÖZELLİKLER:</strong><br/>
+          🗂️ Klasör sistemi eklendi!<br/>
+          🗜️ ZIP dosyası desteği (500MB)!<br/>
+          📤 Admin ZIP gönderebilir!<br/>
+          📥 Müşteri ZIP yükleyebilir!<br/>
           👤 test@otel.com / 123456<br/>
           🛡️ admin@rotakalite.com / admin123
         </div>
@@ -183,6 +234,8 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [category, setCategory] = useState('report');
+  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [folders, setFolders] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -192,6 +245,13 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
     { id: 'form', label: '📋 Form', color: '#f59e0b' },
     { id: 'document', label: '📄 Belge', color: '#8b5cf6' }
   ];
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      const customerFolders = getFoldersFromStorage(selectedCustomer);
+      setFolders(customerFolders);
+    }
+  }, [selectedCustomer]);
 
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -213,16 +273,25 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         
+        // ZIP dosyası boyut kontrolü
+        const maxSize = file.name.toLowerCase().endsWith('.zip') ? 500 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+          const maxSizeMB = file.name.toLowerCase().endsWith('.zip') ? 500 : 10;
+          alert(`${file.name} çok büyük! Maksimum ${maxSizeMB}MB`);
+          continue;
+        }
+        
         for (let progress = 0; progress <= 100; progress += 25) {
           setUploadProgress(((i * 100) + progress) / selectedFiles.length);
           await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        await saveFileToStorage(file, selectedCustomer, 'admin', category);
+        await saveFileToStorage(file, selectedCustomer, 'admin', category, selectedFolder);
       }
 
       setSelectedFiles([]);
       setSelectedCustomer('');
+      setSelectedFolder(null);
       setUploadProgress(100);
       alert(`Dosyalar ${customers.find(c => c.id === selectedCustomer)?.companyName} için başarıyla gönderildi!`);
       
@@ -242,6 +311,7 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
     if (type.includes('word') || type.includes('document')) return '📝';
     if (type.includes('excel') || type.includes('sheet')) return '📊';
     if (type.includes('image')) return '🖼️';
+    if (type.includes('zip')) return '🗜️';
     return '📎';
   };
 
@@ -290,6 +360,33 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
         </select>
       </div>
 
+      {/* Folder Selection */}
+      {selectedCustomer && folders.length > 0 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+            📁 Klasör Seçin (Opsiyonel)
+          </label>
+          <select
+            value={selectedFolder || ''}
+            onChange={(e) => setSelectedFolder(e.target.value || null)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.5rem',
+              fontSize: '1rem'
+            }}
+          >
+            <option value="">Ana klasör</option>
+            {folders.map(folder => (
+              <option key={folder.id} value={folder.id}>
+                📁 {folder.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Category Selection */}
       <div style={{ marginBottom: '1.5rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
@@ -327,8 +424,11 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
           multiple
           onChange={handleFileSelect}
           style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.5rem' }}
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip"
         />
+        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+          🗜️ ZIP dosyaları için maksimum 500MB, diğer dosyalar için 10MB
+        </p>
       </div>
 
       {/* Selected Files */}
@@ -423,18 +523,25 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
 
 const CustomerReceivedFiles = ({ user }) => {
   const [receivedFiles, setReceivedFiles] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [currentFolder, setCurrentFolder] = useState(null);
 
   useEffect(() => {
     // Load files sent by admin to this customer
-    const files = getFilesFromStorage(user.id, 'admin');
+    const files = getFilesFromStorage(user.id, 'admin', currentFolder);
     setReceivedFiles(files);
-  }, [user.id]);
+    
+    // Load folders for this customer
+    const customerFolders = getFoldersFromStorage(user.id, currentFolder);
+    setFolders(customerFolders);
+  }, [user.id, currentFolder]);
 
   const getFileIcon = (type) => {
     if (type.includes('pdf')) return '📄';
     if (type.includes('word') || type.includes('document')) return '📝';
     if (type.includes('excel') || type.includes('sheet')) return '📊';
     if (type.includes('image')) return '🖼️';
+    if (type.includes('zip')) return '🗜️';
     return '📎';
   };
 
@@ -475,7 +582,26 @@ const CustomerReceivedFiles = ({ user }) => {
         Danışmanlarımız tarafından size özel hazırlanan belgeler ve raporlar
       </p>
 
-      {receivedFiles.length === 0 ? (
+      {/* Breadcrumb & Back Button */}
+      {currentFolder && (
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => setCurrentFolder(null)}
+            style={{
+              background: '#f3f4f6',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem'
+            }}
+          >
+            ← Ana Klasöre Dön
+          </button>
+        </div>
+      )}
+
+      {(receivedFiles.length === 0 && folders.length === 0) ? (
         <div style={{
           background: 'white',
           padding: '3rem',
@@ -498,12 +624,53 @@ const CustomerReceivedFiles = ({ user }) => {
         }}>
           <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
-              📋 Size Gönderilen Belgeler ({receivedFiles.length})
+              📋 Size Gönderilen Belgeler ({receivedFiles.length + folders.length})
             </h3>
           </div>
           
           <div style={{ padding: '1.5rem' }}>
             <div style={{ space: '1rem' }}>
+              {/* Klasörler */}
+              {folders.map((folder) => (
+                <div key={folder.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: '#fffbeb',
+                  padding: '1.5rem',
+                  borderRadius: '0.75rem',
+                  marginBottom: '1rem',
+                  border: '1px solid #fde68a',
+                  cursor: 'pointer'
+                }}
+                onClick={() => setCurrentFolder(folder.id)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{
+                      width: '3rem',
+                      height: '3rem',
+                      borderRadius: '0.5rem',
+                      background: '#fbbf24',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.5rem',
+                      marginRight: '1rem'
+                    }}>
+                      📁
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: '600', fontSize: '1.125rem' }}>{folder.name}</p>
+                      <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+                        {new Date(folder.createdDate).toLocaleDateString('tr-TR')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Dosyalar */}
               {receivedFiles.map((file) => (
                 <div key={file.id} style={{
                   display: 'flex',
@@ -594,12 +761,32 @@ const FileUpload = ({ user, onFileUpload }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [currentFolder, setCurrentFolder] = useState(null);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [showNewFolderInput, setShowNewFolderInput] = useState(false);
 
   useEffect(() => {
-    // Load customer's own uploaded files
-    const files = getFilesFromStorage(user.id, 'customer');
+    // Load customer's own uploaded files in current folder
+    const files = getFilesFromStorage(user.id, 'customer', currentFolder);
     setUploadedFiles(files);
-  }, [user.id]);
+    
+    // Load folders for current directory
+    const customerFolders = getFoldersFromStorage(user.id, currentFolder);
+    setFolders(customerFolders);
+  }, [user.id, currentFolder]);
+
+  const createNewFolder = () => {
+    if (newFolderName.trim()) {
+      saveFolderToStorage(newFolderName.trim(), user.id, currentFolder);
+      setNewFolderName('');
+      setShowNewFolderInput(false);
+      
+      // Refresh folders
+      const customerFolders = getFoldersFromStorage(user.id, currentFolder);
+      setFolders(customerFolders);
+    }
+  };
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -638,16 +825,22 @@ const FileUpload = ({ user, onFileUpload }) => {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'image/jpeg',
       'image/png',
-      'image/jpg'
+      'image/jpg',
+      'application/zip',
+      'application/x-zip-compressed'
     ];
 
     const validFiles = files.filter(file => {
-      if (!allowedTypes.includes(file.type)) {
+      if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.zip')) {
         alert(`${file.name} desteklenmeyen dosya türü!`);
         return false;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`${file.name} çok büyük! Maksimum 10MB`);
+      
+      // ZIP dosyası için 500MB, diğerleri için 10MB
+      const maxSize = file.name.toLowerCase().endsWith('.zip') ? 500 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        const maxSizeMB = file.name.toLowerCase().endsWith('.zip') ? 500 : 10;
+        alert(`${file.name} çok büyük! Maksimum ${maxSizeMB}MB`);
         return false;
       }
       return true;
@@ -671,7 +864,7 @@ const FileUpload = ({ user, onFileUpload }) => {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        const savedFile = await saveFileToStorage(file, user.id, 'customer', 'general');
+        const savedFile = await saveFileToStorage(file, user.id, 'customer', 'general', currentFolder);
         setUploadedFiles(prev => [...prev, savedFile]);
       }
 
@@ -697,6 +890,14 @@ const FileUpload = ({ user, onFileUpload }) => {
     }
   };
 
+  const handleDeleteFolder = (folderId) => {
+    if (confirm('Bu klasörü ve içindeki tüm dosyaları silmek istediğinizden emin misiniz?')) {
+      deleteFolderFromStorage(folderId);
+      setFolders(prev => prev.filter(f => f.id !== folderId));
+      setUploadedFiles(prev => prev.filter(f => f.folderId !== folderId));
+    }
+  };
+
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -710,6 +911,7 @@ const FileUpload = ({ user, onFileUpload }) => {
     if (type.includes('word') || type.includes('document')) return '📝';
     if (type.includes('excel') || type.includes('sheet')) return '📊';
     if (type.includes('image')) return '🖼️';
+    if (type.includes('zip')) return '🗜️';
     return '📎';
   };
 
@@ -717,8 +919,99 @@ const FileUpload = ({ user, onFileUpload }) => {
     <div style={{ maxWidth: '4xl', margin: '0 auto', padding: '2rem' }}>
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>📁 Belge Yükleme</h1>
       <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-        Danışmanlık süreciniz için gerekli belgeleri yükleyin
+        Danışmanlık süreciniz için gerekli belgeleri yükleyin (ZIP desteği: 500MB'a kadar!)
       </p>
+
+      {/* Breadcrumb & Back Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        {currentFolder && (
+          <button
+            onClick={() => setCurrentFolder(null)}
+            style={{
+              background: '#f3f4f6',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem'
+            }}
+          >
+            ← Ana Klasöre Dön
+          </button>
+        )}
+
+        {/* New Folder Button */}
+        <button
+          onClick={() => setShowNewFolderInput(true)}
+          style={{
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: 'white',
+            border: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: '0.5rem',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: '500'
+          }}
+        >
+          📁 Yeni Klasör
+        </button>
+      </div>
+
+      {/* New Folder Input */}
+      {showNewFolderInput && (
+        <div style={{
+          background: '#fef3c7',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          gap: '0.5rem',
+          alignItems: 'center'
+        }}>
+          <input
+            type="text"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="Klasör adı"
+            style={{
+              flex: 1,
+              padding: '0.5rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.25rem'
+            }}
+          />
+          <button
+            onClick={createNewFolder}
+            style={{
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
+          >
+            Oluştur
+          </button>
+          <button
+            onClick={() => {
+              setShowNewFolderInput(false);
+              setNewFolderName('');
+            }}
+            style={{
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.25rem',
+              cursor: 'pointer'
+            }}
+          >
+            İptal
+          </button>
+        </div>
+      )}
 
       {/* Upload Area */}
       <div style={{
@@ -748,7 +1041,7 @@ const FileUpload = ({ user, onFileUpload }) => {
             onChange={handleFileInputChange}
             style={{ display: 'none' }}
             id="file-upload"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip"
           />
           
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📁</div>
@@ -774,7 +1067,7 @@ const FileUpload = ({ user, onFileUpload }) => {
             📎 Dosya Seç
           </label>
           <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '1rem' }}>
-            PDF, Word, Excel, Resim (Maks. 10MB)
+            PDF, Word, Excel, Resim, ZIP (Maks. 10MB, ZIP için 500MB)
           </p>
         </div>
 
@@ -867,8 +1160,8 @@ const FileUpload = ({ user, onFileUpload }) => {
         )}
       </div>
 
-      {/* Uploaded Files List */}
-      {uploadedFiles.length > 0 && (
+      {/* Folders and Files List */}
+      {(folders.length > 0 || uploadedFiles.length > 0) && (
         <div style={{
           background: 'white',
           borderRadius: '1rem',
@@ -876,9 +1169,51 @@ const FileUpload = ({ user, onFileUpload }) => {
           padding: '2rem'
         }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
-            📋 Yüklediğiniz Dosyalar ({uploadedFiles.length})
+            📋 Dosyalarınız ({folders.length + uploadedFiles.length})
           </h3>
           <div style={{ space: '0.75rem' }}>
+            {/* Klasörler */}
+            {folders.map((folder) => (
+              <div key={folder.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#fffbeb',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                marginBottom: '0.75rem',
+                border: '1px solid #fde68a'
+              }}>
+                <div 
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flex: 1 }}
+                  onClick={() => setCurrentFolder(folder.id)}
+                >
+                  <span style={{ fontSize: '2rem', marginRight: '1rem' }}>📁</span>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: '500' }}>{folder.name}</p>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+                      {new Date(folder.createdDate).toLocaleDateString('tr-TR')}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDeleteFolder(folder.id)}
+                  style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    padding: '0.25rem 0.75rem',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  🗑️ Sil
+                </button>
+              </div>
+            ))}
+
+            {/* Dosyalar */}
             {uploadedFiles.map((file) => (
               <div key={file.id} style={{
                 display: 'flex',
@@ -943,6 +1278,7 @@ const FileUpload = ({ user, onFileUpload }) => {
 const AdminDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [allFiles, setAllFiles] = useState([]);
+  const [allFolders, setAllFolders] = useState([]);
   const [customers] = useState([
     {
       id: 'customer1',
@@ -965,11 +1301,15 @@ const AdminDashboard = ({ user, onLogout }) => {
   useEffect(() => {
     const files = getFilesFromStorage();
     setAllFiles(files);
+    const folders = getFoldersFromStorage();
+    setAllFolders(folders);
   }, [activeTab]);
 
   const refreshFiles = () => {
     const files = getFilesFromStorage();
     setAllFiles(files);
+    const folders = getFoldersFromStorage();
+    setAllFolders(folders);
   };
 
   const getCustomerName = (userId) => {
@@ -982,6 +1322,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     if (type.includes('word') || type.includes('document')) return '📝';
     if (type.includes('excel') || type.includes('sheet')) return '📊';
     if (type.includes('image')) return '🖼️';
+    if (type.includes('zip')) return '🗜️';
     return '📎';
   };
 
@@ -1005,7 +1346,7 @@ const AdminDashboard = ({ user, onLogout }) => {
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
-          🛡️ ROTA <span style={{ color: '#fbbf24' }}>ADMIN v2.1</span>
+          🛡️ ROTA <span style={{ color: '#fbbf24' }}>ADMIN v2.2</span>
         </h1>
         <div>
           <span style={{ marginRight: '1rem' }}>👋 {user.name}</span>
@@ -1111,9 +1452,9 @@ const AdminDashboard = ({ user, onLogout }) => {
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>📥 Alınan</h3>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', opacity: 0.9 }}>📁 Klasörler</h3>
                 <p style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: 0 }}>
-                  {allFiles.filter(f => f.uploadedBy === 'customer').length}
+                  {allFolders.length}
                 </p>
               </div>
             </div>
@@ -1124,19 +1465,19 @@ const AdminDashboard = ({ user, onLogout }) => {
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🚀 v2.1 BOMBA ÖZELLİK!</h3>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🚀 v2.2 YENİ ÖZELLİKLER!</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
                 <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
-                  <strong>📤 Admin Dosya Gönderimi</strong><br/>
-                  <small>Müşterilere rapor, sertifika gönderebilirsiniz!</small>
+                  <strong>🗜️ ZIP Desteği</strong><br/>
+                  <small>500MB'a kadar ZIP dosyası yükleme!</small>
                 </div>
                 <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '0.5rem' }}>
-                  <strong>📥 Müşteri Görüntüleme</strong><br/>
-                  <small>Müşteriler size özel belgeleri görebilir!</small>
+                  <strong>📁 Klasör Sistemi</strong><br/>
+                  <small>Organize dosya yönetimi!</small>
                 </div>
                 <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '0.5rem' }}>
-                  <strong>📂 Kategori Sistemi</strong><br/>
-                  <small>Rapor, Sertifika, Form, Belge kategorileri!</small>
+                  <strong>📤 Admin ZIP Gönderimi</strong><br/>
+                  <small>Müşterilere ZIP arşivi gönderin!</small>
                 </div>
               </div>
             </div>
@@ -1292,6 +1633,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📧 Email</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📁 Dosyalar</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📤 Gönderilenler</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>🗂️ Klasörler</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📅 Kayıt</th>
                   </tr>
                 </thead>
@@ -1299,6 +1641,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                   {customers.map(customer => {
                     const customerFiles = allFiles.filter(f => f.userId === customer.id && f.uploadedBy === 'customer');
                     const sentFiles = allFiles.filter(f => f.userId === customer.id && f.uploadedBy === 'admin');
+                    const customerFolders = allFolders.filter(f => f.userId === customer.id);
                     return (
                       <tr key={customer.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                         <td style={{ padding: '1rem' }}>
@@ -1325,6 +1668,17 @@ const AdminDashboard = ({ user, onLogout }) => {
                             fontSize: '0.75rem'
                           }}>
                             📤 {sentFiles.length} gönderildi
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            background: customerFolders.length > 0 ? '#fef3c7' : '#f3f4f6',
+                            color: customerFolders.length > 0 ? '#92400e' : '#6b7280',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '1rem',
+                            fontSize: '0.75rem'
+                          }}>
+                            📁 {customerFolders.length} klasör
                           </span>
                         </td>
                         <td style={{ padding: '1rem', color: '#6b7280' }}>
@@ -1357,7 +1711,7 @@ const Dashboard = ({ user, onLogout }) => {
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
-          ROTA <span style={{ color: '#10b981' }}>CRM v2.1</span>
+          ROTA <span style={{ color: '#10b981' }}>CRM v2.2</span>
         </h1>
         <div>
           <span style={{ marginRight: '1rem' }}>Hoş geldiniz, {user.companyName}</span>
@@ -1455,6 +1809,19 @@ const Dashboard = ({ user, onLogout }) => {
                   {getFilesFromStorage(user.id, 'admin').length}
                 </p>
               </div>
+
+              <div style={{
+                background: 'white',
+                padding: '1.5rem',
+                borderRadius: '0.75rem',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                borderLeft: '4px solid #8b5cf6'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Klasörleriniz</h3>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                  {getFoldersFromStorage(user.id).length}
+                </p>
+              </div>
             </div>
 
             <div style={{
@@ -1463,22 +1830,22 @@ const Dashboard = ({ user, onLogout }) => {
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🎉 v2.1 BOMBA GÜNCELLEME!</h3>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🎉 v2.2 SÜPER GÜNCELLEME!</h3>
               <p style={{ marginBottom: '1rem', color: '#059669', fontWeight: '500' }}>
-                Artık danışmanlarınız size özel belgeler gönderebilir!
+                Artık ZIP dosyaları ve klasör sistemi ile çok daha organize!
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
-                  <strong>📥 Size Özel Belgeler</strong><br/>
-                  <small>Raporlar, sertifikalar ve belgeler!</small>
+                  <strong>🗜️ ZIP Desteği</strong><br/>
+                  <small>500MB'a kadar ZIP dosyası yükleyin!</small>
                 </div>
                 <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '0.5rem' }}>
-                  <strong>📊 Kategori Sistemi</strong><br/>
-                  <small>Düzenli dosya kategorileri</small>
+                  <strong>📁 Klasör Sistemi</strong><br/>
+                  <small>Dosyalarınızı organize edin!</small>
                 </div>
                 <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '0.5rem' }}>
-                  <strong>🔄 Anlık Güncelleme</strong><br/>
-                  <small>Yeni belgeler anında görünür</small>
+                  <strong>🔄 Gelişmiş Yönetim</strong><br/>
+                  <small>Klasörler arası gezinme!</small>
                 </div>
               </div>
             </div>
