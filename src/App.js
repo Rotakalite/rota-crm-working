@@ -329,7 +329,11 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
       currentFolder = allFolders.find(f => f.id === currentFolder.parentId);
     }
     
-    return path.join(' > ');
+    // Derinlik seviyesine göre girinti ekle
+    const depth = path.length - 1;
+    const indent = '　'.repeat(depth); // Tam genişlik boşluk karakteri
+    
+    return indent + path[path.length - 1]; // Sadece son klasör adını göster ama girintili
   };
 
   const handleFileSelect = (e) => {
@@ -457,11 +461,14 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
             }}
           >
             <option value="">Ana klasör</option>
-            {folders.map(folder => (
-              <option key={folder.id} value={folder.id}>
-                📁 {getFolderDisplayName(folder, folders)}
-              </option>
-            ))}
+            {folders.map(folder => {
+              const displayName = getFolderDisplayName(folder, folders);
+              return (
+                <option key={folder.id} value={folder.id}>
+                  📁 {displayName}
+                </option>
+              );
+            })}
           </select>
         </div>
       )}
@@ -708,6 +715,27 @@ const CustomerReceivedFiles = ({ user }) => {
         >
           🏠 Ana Sayfa
         </button>
+        
+        {/* Bir Üst Klasör Butonu */}
+        {currentFolder && breadcrumb.length > 0 && (
+          <button
+            onClick={() => {
+              const parentId = breadcrumb[breadcrumb.length - 1]?.parentId || null;
+              navigateToFolder(parentId);
+            }}
+            style={{
+              background: '#fef3c7',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              color: '#92400e'
+            }}
+          >
+            ⬆️ Bir Üst Klasör
+          </button>
+        )}
         
         {breadcrumb.map((folder, index) => (
           <React.Fragment key={folder.id}>
@@ -1099,6 +1127,27 @@ const FileUpload = ({ user, onFileUpload }) => {
           >
             🏠 Ana Sayfa
           </button>
+          
+          {/* Bir Üst Klasör Butonu */}
+          {currentFolder && breadcrumb.length > 0 && (
+            <button
+              onClick={() => {
+                const parentId = breadcrumb[breadcrumb.length - 1]?.parentId || null;
+                navigateToFolder(parentId);
+              }}
+              style={{
+                background: '#fef3c7',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: '#92400e'
+              }}
+            >
+              ⬆️ Bir Üst Klasör
+            </button>
+          )}
           
           {breadcrumb.map((folder, index) => (
             <React.Fragment key={folder.id}>
