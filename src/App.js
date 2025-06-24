@@ -4,21 +4,29 @@ import React, { useState, useEffect } from 'react';
 const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general') => {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
+      const fileData = {
+        id: Date.now() + Math.random(),
+        name: file.name,
+        size: file.size,
         type: file.type,
-        reader.onload = function (e) {
-  const fileData = {
-    id: Date.now() + Math.random(),
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    content: e.target.result,
-    userId: userId,
-    uploadedBy: uploadedBy, // 'customer' or 'admin'
-    category: category,     // 'general', 'report', 'certificate', 'form'
-    uploadDate: new Date().toISOString(),
-    status: 'uploaded',
-  };
+        content: e.target.result,
+        userId: userId,
+        uploadedBy: uploadedBy, // 'customer' or 'admin'
+        category: category,     // 'general', 'report', 'certificate', 'form'
+        uploadDate: new Date().toISOString(),
+        status: 'uploaded',
+      };
+      // Save to localStorage
+      const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
+      existingFiles.push(fileData);
+      localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
+      resolve(fileData);
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
   // Save to localStorage
   const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
   existingFiles.push(fileData);
