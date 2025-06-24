@@ -6,13 +6,25 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
     const reader = new FileReader();
     reader.onload = function(e) {
         type: file.type,
-        content: e.target.result,
-        userId: userId,
-        uploadedBy: uploadedBy, // 'customer' or 'admin'
-        category: category, // 'general', 'report', 'certificate', 'form'
-        uploadDate: new Date().toISOString(),
-        status: 'uploaded'
-      };
+        reader.onload = function (e) {
+  const fileData = {
+    id: Date.now() + Math.random(),
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    content: e.target.result,
+    userId: userId,
+    uploadedBy: uploadedBy, // 'customer' or 'admin'
+    category: category,     // 'general', 'report', 'certificate', 'form'
+    uploadDate: new Date().toISOString(),
+    status: 'uploaded',
+  };
+  // Save to localStorage
+  const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
+  existingFiles.push(fileData);
+  localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
+  resolve(fileData);
+};
 
       // Save to localStorage
       const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
