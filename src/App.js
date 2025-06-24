@@ -5,7 +5,6 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = function(e) {
-@@ -12,11 +12,12 @@
         type: file.type,
         content: e.target.result,
         userId: userId,
@@ -19,7 +18,6 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
       const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
       existingFiles.push(fileData);
       localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
-@@ -27,9 +28,19 @@
   });
 };
 
@@ -41,7 +39,6 @@ const getFilesFromStorage = (userId = null, uploadedBy = null) => {
 };
 
 const deleteFileFromStorage = (fileId) => {
-@@ -98,7 +109,7 @@
             fontWeight: 'bold'
           }}>R</div>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', margin: '0 0 0.5rem' }}>ROTA CRM</h2>
@@ -50,7 +47,6 @@ const deleteFileFromStorage = (fileId) => {
         </div>
 
         <form onSubmit={handleSubmit}>
-@@ -157,9 +168,9 @@
         </form>
 
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
@@ -63,7 +59,6 @@ const deleteFileFromStorage = (fileId) => {
           👤 test@otel.com / 123456<br/>
           🛡️ admin@rotakalite.com / admin123
         </div>
-@@ -168,6 +179,415 @@
   );
 };
 
@@ -479,7 +474,6 @@ const CustomerReceivedFiles = ({ user }) => {
 const FileUpload = ({ user, onFileUpload }) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
-@@ -176,8 +596,8 @@
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
   useEffect(() => {
@@ -490,7 +484,6 @@ const FileUpload = ({ user, onFileUpload }) => {
     setUploadedFiles(files);
   }, [user.id]);
 
-@@ -210,7 +630,6 @@
   };
 
   const handleFileSelect = (files) => {
@@ -498,7 +491,6 @@ const FileUpload = ({ user, onFileUpload }) => {
     const allowedTypes = [
       'application/pdf',
       'application/msword',
-@@ -227,7 +646,7 @@
         alert(`${file.name} desteklenmeyen dosya türü!`);
         return false;
       }
@@ -507,7 +499,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         alert(`${file.name} çok büyük! Maksimum 10MB`);
         return false;
       }
-@@ -247,14 +666,12 @@
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
 
@@ -523,7 +514,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         setUploadedFiles(prev => [...prev, savedFile]);
       }
 
-@@ -459,7 +876,7 @@
           padding: '2rem'
         }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
@@ -532,7 +522,6 @@ const FileUpload = ({ user, onFileUpload }) => {
           </h3>
           <div style={{ space: '0.75rem' }}>
             {uploadedFiles.map((file) => (
-@@ -546,11 +963,15 @@
   ]);
 
   useEffect(() => {
@@ -549,7 +538,6 @@ const FileUpload = ({ user, onFileUpload }) => {
   const getCustomerName = (userId) => {
     const customer = customers.find(c => c.id === userId);
     return customer ? customer.companyName : 'Bilinmeyen Müşteri';
-@@ -584,7 +1005,7 @@
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
@@ -558,7 +546,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         </h1>
         <div>
           <span style={{ marginRight: '1rem' }}>👋 {user.name}</span>
-@@ -615,8 +1036,8 @@
         {[
           { id: 'overview', label: '📊 Genel Bakış' },
           { id: 'customers', label: '👥 Müşteriler' },
@@ -569,7 +556,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         ].map(tab => (
           <button
             key={tab.id}
-@@ -677,9 +1098,9 @@
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
@@ -581,7 +567,6 @@ const FileUpload = ({ user, onFileUpload }) => {
                 </p>
               </div>
 
-@@ -690,9 +1111,9 @@
                 borderRadius: '0.75rem',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
@@ -593,7 +578,6 @@ const FileUpload = ({ user, onFileUpload }) => {
                 </p>
               </div>
             </div>
-@@ -703,25 +1124,32 @@
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
@@ -634,7 +618,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         {activeTab === 'files' && (
           <div>
             <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-@@ -738,7 +1166,7 @@
               }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
                 <h3>Henüz dosya yüklenmemiş</h3>
@@ -643,7 +626,6 @@ const FileUpload = ({ user, onFileUpload }) => {
               </div>
             ) : (
               <div style={{
-@@ -753,6 +1181,7 @@
                       <tr>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📎 Dosya</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>🏢 Müşteri</th>
@@ -651,7 +633,6 @@ const FileUpload = ({ user, onFileUpload }) => {
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📏 Boyut</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📅 Tarih</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>⚡ İşlemler</th>
-@@ -783,6 +1212,17 @@
                               {getCustomerName(file.userId)}
                             </span>
                           </td>
@@ -669,7 +650,6 @@ const FileUpload = ({ user, onFileUpload }) => {
                           <td style={{ padding: '1rem', color: '#6b7280' }}>
                             {formatFileSize(file.size)}
                           </td>
-@@ -851,12 +1291,14 @@
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>🏢 Şirket</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📧 Email</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>📁 Dosyalar</th>
@@ -685,7 +665,6 @@ const FileUpload = ({ user, onFileUpload }) => {
                     return (
                       <tr key={customer.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                         <td style={{ padding: '1rem' }}>
-@@ -871,7 +1313,18 @@
                             borderRadius: '1rem',
                             fontSize: '0.75rem'
                           }}>
@@ -705,7 +684,6 @@ const FileUpload = ({ user, onFileUpload }) => {
                           </span>
                         </td>
                         <td style={{ padding: '1rem', color: '#6b7280' }}>
-@@ -885,59 +1338,6 @@
             </div>
           </div>
         )}
@@ -765,7 +743,6 @@ const FileUpload = ({ user, onFileUpload }) => {
       </main>
     </div>
   );
-@@ -957,7 +1357,7 @@
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
@@ -774,7 +751,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         </h1>
         <div>
           <span style={{ marginRight: '1rem' }}>Hoş geldiniz, {user.companyName}</span>
-@@ -987,6 +1387,7 @@
           {[
             { id: 'dashboard', label: '📊 Dashboard' },
             { id: 'upload', label: '📁 Belge Yükle' },
@@ -782,7 +758,6 @@ const FileUpload = ({ user, onFileUpload }) => {
             { id: 'reports', label: '📋 Raporlarım' }
           ].map(tab => (
             <button
-@@ -1036,9 +1437,22 @@
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                 borderLeft: '4px solid #3b82f6'
               }}>
@@ -807,7 +782,6 @@ const FileUpload = ({ user, onFileUpload }) => {
                 </p>
               </div>
             </div>
-@@ -1049,16 +1463,23 @@
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
@@ -839,7 +813,6 @@ const FileUpload = ({ user, onFileUpload }) => {
               </div>
             </div>
           </div>
-@@ -1068,6 +1489,10 @@
           <FileUpload user={user} onFileUpload={() => {}} />
         )}
 
@@ -850,7 +823,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         {activeTab === 'reports' && (
           <div style={{ padding: '2rem' }}>
             <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>📋 Raporlarım</h2>
-@@ -1079,30 +1504,33 @@
               textAlign: 'center'
             }}>
               <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Size özel raporlar hazırlanıyor...</h3>
