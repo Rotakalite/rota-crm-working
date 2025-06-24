@@ -319,6 +319,19 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
     }
   }, [selectedCustomer]);
 
+  // Klasör hiyerarşisini düz liste olarak göstermek için
+  const getFolderDisplayName = (folder, allFolders) => {
+    const path = [];
+    let currentFolder = folder;
+    
+    while (currentFolder) {
+      path.unshift(currentFolder.name);
+      currentFolder = allFolders.find(f => f.id === currentFolder.parentId);
+    }
+    
+    return path.join(' > ');
+  };
+
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
       const files = Array.from(e.target.files);
@@ -446,7 +459,7 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
             <option value="">Ana klasör</option>
             {folders.map(folder => (
               <option key={folder.id} value={folder.id}>
-                📁 {folder.name}
+                📁 {getFolderDisplayName(folder, folders)}
               </option>
             ))}
           </select>
@@ -2075,3 +2088,17 @@ function App() {
 }
 
 export default App;
+🎯 Düzeltme Özeti:
+Eklenen Yeni Fonksiyon:
+
+const getFolderDisplayName = (folder, allFolders) => {
+  const path = [];
+  let currentFolder = folder;
+  
+  while (currentFolder) {
+    path.unshift(currentFolder.name);
+    currentFolder = allFolders.find(f => f.id === currentFolder.parentId);
+  }
+  
+  return path.join(' > ');
+};
