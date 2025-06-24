@@ -12,11 +12,20 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
         type: file.type,
         content: e.target.result,
         userId: userId,
-        uploadedBy: uploadedBy, // 'customer' or 'admin'
-        category: category,     // 'general', 'report', 'certificate', 'form'
+        uploadedBy: uploadedBy,
+        category: category,
         uploadDate: new Date().toISOString(),
         status: 'uploaded',
       };
+      const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
+      existingFiles.push(fileData);
+      localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
+      resolve(fileData);
+    };
+    reader.readAsDataURL(file);
+  }); // 👈 PROMISE BURADA KAPANIYOR
+};
+
       // Save to localStorage
       const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
       existingFiles.push(fileData);
