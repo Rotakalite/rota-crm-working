@@ -36,20 +36,6 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
   });
 };
 
-  // Save to localStorage
-  const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
-  existingFiles.push(fileData);
-  localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
-  resolve(fileData);
-};
-
-      // Save to localStorage
-      const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
-      existingFiles.push(fileData);
-      localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
-  });
-};
-
 const getFilesFromStorage = (userId = null) => {
 const getFilesFromStorage = (userId = null, uploadedBy = null) => {
   const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
