@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
 // File storage utility functions
-const saveFileToStorage = (file, userId) => {
 const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general') => {
   return new Promise((resolve) => {Add commentMore actions
     const reader = new FileReader();
