@@ -26,14 +26,14 @@ const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'ge
   }); // 👈 PROMISE BURADA KAPANIYOR
 };
 
-      // Save to localStorage
+       // Save to localStorage
       const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
       existingFiles.push(fileData);
       localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
       resolve(fileData);
     };
     reader.readAsDataURL(file);
-  });
+  }); // <-- Promise burada sonlanır
 };
 
 const getFilesFromStorage = (userId = null) => {
