@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 // File storage utility functions
 const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general') => {
-  return new Promise((resolve) => {Add commentMore actions
+  return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = function(e) {
 @@ -12,11 +12,12 @@
