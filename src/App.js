@@ -2088,17 +2088,3 @@ function App() {
 }
 
 export default App;
-🎯 Düzeltme Özeti:
-Eklenen Yeni Fonksiyon:
-
-const getFolderDisplayName = (folder, allFolders) => {
-  const path = [];
-  let currentFolder = folder;
-  
-  while (currentFolder) {
-    path.unshift(currentFolder.name);
-    currentFolder = allFolders.find(f => f.id === currentFolder.parentId);
-  }
-  
-  return path.join(' > ');
-};
