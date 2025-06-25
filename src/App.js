@@ -1,193 +1,229 @@
 import React, { useState, useEffect } from 'react';
 
-// File storage utility functions
-const saveFileToStorage = (file, userId, uploadedBy = 'customer', category = 'general', folderId = null) => {
-  return new Promise((resolve) => {
+// API Configuration
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
+
+// API utility functions
+const apiCall = async (url, options = {}) => {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API call failed: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+// NEW: Backend API file storage functions
+const saveFileToStorage = async (file, userId, uploadedBy = 'customer', category = 'general', folderId = null) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = function(e) {
-      const fileData = {
-        id: Date.now() + Math.random(),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        content: e.target.result,
-        userId: userId,
-        uploadedBy: uploadedBy, // 'customer' or 'admin'
-        category: category, // 'general', 'report', 'certificate', 'form'
-        folderId: folderId, // NEW: Klasör ID'si
-        uploadDate: new Date().toISOString(),
-        status: 'uploaded'
-      };
-      
-      const existingFiles = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
-      existingFiles.push(fileData);
-      localStorage.setItem('rotaFiles', JSON.stringify(existingFiles));
-      
-      resolve(fileData);
+    reader.onload = async function(e) {
+      try {
+        const fileData = {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: e.target.result,
+          userId: userId,
+          uploadedBy: uploadedBy,
+          category: category,
+          folderId: folderId
+        };
+        
+        const result = await apiCall(`${API}/files`, {
+          method: 'POST',
+          body: JSON.stringify(fileData)
+        });
+        
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
     };
     reader.readAsDataURL(file);
   });
 };
 
-const getFilesFromStorage = (userId = null, uploadedBy = null, folderId = null) => {
-  const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
-  let filteredFiles = files;
-  
-  if (userId) {
-    filteredFiles = filteredFiles.filter(f => f.userId === userId);
+const getFilesFromStorage = async (userId = null, uploadedBy = null, folderId = null) => {
+  try {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    if (uploadedBy) params.append('uploadedBy', uploadedBy);
+    if (folderId !== null) params.append('folderId', folderId);
+    
+    const url = `${API}/files${params.toString() ? '?' + params.toString() : ''}`;
+    return await apiCall(url);
+  } catch (error) {
+    console.error('Error fetching files:', error);
+    return [];
   }
-  
-  if (uploadedBy) {
-    filteredFiles = filteredFiles.filter(f => f.uploadedBy === uploadedBy);
-  }
-
-  if (folderId !== null) {
-    filteredFiles = filteredFiles.filter(f => f.folderId === folderId);
-  }
-  
-  return filteredFiles;
 };
 
-const deleteFileFromStorage = (fileId) => {
-  const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
-  const updatedFiles = files.filter(f => f.id !== fileId);
-  localStorage.setItem('rotaFiles', JSON.stringify(updatedFiles));
+const deleteFileFromStorage = async (fileId) => {
+  try {
+    await apiCall(`${API}/files/${fileId}`, {
+      method: 'DELETE'
+    });
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    throw error;
+  }
 };
 
-// NEW: Klasör yönetimi fonksiyonları
-const saveFolderToStorage = (folderName, userId, parentId = null) => {
-  const folderData = {
-    id: Date.now() + Math.random(),
-    name: folderName,
-    userId: userId,
-    parentId: parentId,
-    createdDate: new Date().toISOString(),
-    type: 'folder'
-  };
-  
-  const existingFolders = JSON.parse(localStorage.getItem('rotaFolders') || '[]');
-  existingFolders.push(folderData);
-  localStorage.setItem('rotaFolders', JSON.stringify(existingFolders));
-  
-  return folderData;
+// NEW: Backend API folder management functions
+const saveFolderToStorage = async (folderName, userId, parentId = null) => {
+  try {
+    const folderData = {
+      name: folderName,
+      userId: userId,
+      parentId: parentId
+    };
+    
+    return await apiCall(`${API}/folders`, {
+      method: 'POST',
+      body: JSON.stringify(folderData)
+    });
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    throw error;
+  }
 };
 
-const getFoldersFromStorage = (userId = null, parentId = null) => {
-  const folders = JSON.parse(localStorage.getItem('rotaFolders') || '[]');
-  let filteredFolders = folders;
+const getFoldersFromStorage = async (userId = null, parentId = null) => {
+  try {
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+    if (parentId !== null) params.append('parentId', parentId);
+    
+    const url = `${API}/folders${params.toString() ? '?' + params.toString() : ''}`;
+    return await apiCall(url);
+  } catch (error) {
+    console.error('Error fetching folders:', error);
+    return [];
+  }
+};
+
+const deleteFolderFromStorage = async (folderId) => {
+  try {
+    await apiCall(`${API}/folders/${folderId}`, {
+      method: 'DELETE'
+    });
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    throw error;
+  }
+};
+
+// Helper functions for folder hierarchy
+const buildFolderPath = (folderId, allFolders) => {
+  if (!folderId) return [];
   
-  if (userId) {
-    filteredFolders = filteredFolders.filter(f => f.userId === userId);
+  const path = [];
+  let currentId = folderId;
+  
+  while (currentId && path.length < 10) {
+    const folder = allFolders.find(f => f.id === currentId);
+    if (!folder) break;
+    
+    path.unshift(folder);
+    currentId = folder.parentId;
   }
   
-  if (parentId !== undefined) {
-    filteredFolders = filteredFolders.filter(f => f.parentId === parentId);
-  }
-  
-  return filteredFolders;
+  return path;
 };
 
-const deleteFolderFromStorage = (folderId) => {
-  const folders = JSON.parse(localStorage.getItem('rotaFolders') || '[]');
-  const updatedFolders = folders.filter(f => f.id !== folderId);
-  localStorage.setItem('rotaFolders', JSON.stringify(updatedFolders));
-  
-  // Klasördeki dosyaları da sil
-  const files = JSON.parse(localStorage.getItem('rotaFiles') || '[]');
-  const updatedFiles = files.filter(f => f.folderId !== folderId);
-  localStorage.setItem('rotaFiles', JSON.stringify(updatedFiles));
+const getFolderHierarchy = (folders) => {
+  return folders.map(folder => {
+    const path = buildFolderPath(folder.id, folders);
+    const depth = path.length - 1;
+    const displayName = path.map(p => p.name).join(' > ');
+    
+    return {
+      ...folder,
+      path,
+      depth,
+      displayName,
+      fullPath: displayName
+    };
+  }).sort((a, b) => {
+    if (a.depth !== b.depth) return a.depth - b.depth;
+    return a.displayName.localeCompare(b.displayName, 'tr');
+  });
 };
 
-// NEW: Sürdürülebilir Turizm Yönetim Sistemi klasör yapısını oluşturma
-const createSustainableTourismFolders = (userId) => {
-  const existingFolders = JSON.parse(localStorage.getItem('rotaFolders') || '[]');
-  
-  // Ana klasör zaten var mı kontrol et
-  const mainFolderExists = existingFolders.some(f => 
-    f.name === 'Sürdürülebilir Turizm Yönetim Sistemi' && 
-    f.userId === userId && 
-    f.parentId === null
-  );
-  
-  if (mainFolderExists) {
-    return; // Zaten oluşturulmuş
+// NEW: Create sustainable tourism folders via API
+const createSustainableTourismFolders = async (userId) => {
+  try {
+    await apiCall(`${API}/folders/sustainable-tourism/${userId}`, {
+      method: 'POST'
+    });
+    console.log('Sürdürülebilir Turizm Yönetim Sistemi klasör yapısı oluşturuldu!');
+  } catch (error) {
+    console.error('Error creating sustainable tourism folders:', error);
   }
-  
-  // Ana klasörü oluştur
-  const mainFolder = saveFolderToStorage('Sürdürülebilir Turizm Yönetim Sistemi', userId, null);
-  
-  // A Sütunu klasörü ve alt klasörleri
-  const aFolder = saveFolderToStorage('A SÜTUNU', userId, mainFolder.id);
-  const aSubfolders = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7.1', 'A7.2', 'A7.3', 'A7.4', 'A8', 'A9', 'A10'];
-  aSubfolders.forEach(name => {
-    saveFolderToStorage(name, userId, aFolder.id);
-  });
-  
-  // B Sütunu klasörü ve alt klasörleri
-  const bFolder = saveFolderToStorage('B SÜTUNU', userId, mainFolder.id);
-  const bSubfolders = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9'];
-  bSubfolders.forEach(name => {
-    saveFolderToStorage(name, userId, bFolder.id);
-  });
-  
-  // C Sütunu klasörü ve alt klasörleri
-  const cFolder = saveFolderToStorage('C SÜTUNU', userId, mainFolder.id);
-  const cSubfolders = ['C1', 'C2', 'C3', 'C4'];
-  cSubfolders.forEach(name => {
-    saveFolderToStorage(name, userId, cFolder.id);
-  });
-  
-  // D Sütunu klasörü ve karmaşık alt yapısı
-  const dFolder = saveFolderToStorage('D SÜTUNU', userId, mainFolder.id);
-  
-  // D1 ve alt klasörleri
-  const d1Folder = saveFolderToStorage('D1', userId, dFolder.id);
-  const d1Subfolders = ['D1.1', 'D1.2', 'D1.3', 'D1.4'];
-  d1Subfolders.forEach(name => {
-    saveFolderToStorage(name, userId, d1Folder.id);
-  });
-  
-  // D2 ve alt klasörleri
-  const d2Folder = saveFolderToStorage('D2', userId, dFolder.id);
-  const d2Subfolders = ['D2.1', 'D2.2', 'D2.3', 'D2.4', 'D2.5', 'D2.6'];
-  d2Subfolders.forEach(name => {
-    saveFolderToStorage(name, userId, d2Folder.id);
-  });
-  
-  // D3 ve alt klasörleri
-  const d3Folder = saveFolderToStorage('D3', userId, dFolder.id);
-  const d3Subfolders = ['D3.1', 'D3.2', 'D3.3', 'D3.4', 'D3.5', 'D3.6'];
-  d3Subfolders.forEach(name => {
-    saveFolderToStorage(name, userId, d3Folder.id);
-  });
-  
-  console.log('Sürdürülebilir Turizm Yönetim Sistemi klasör yapısı oluşturuldu!');
 };
 
 const LoginForm = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (email && password) {
-      if (email === 'admin@rotakalite.com' && password === 'admin123') {
-        onLogin({ 
-          id: 'admin',
-          email, 
-          name: 'ROTA Admin', 
-          role: 'admin',
-          isAdmin: true 
+      setIsLoading(true);
+      try {
+        const formData = new FormData();
+        formData.append('email', email);
+        formData.append('password', password);
+
+        const response = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          body: formData
         });
-      } else {
-        onLogin({ 
-          id: 'customer1',
-          email, 
-          companyName: 'Örnek Otel A.Ş.', 
-          stage: 2,
-          role: 'customer',
-          isAdmin: false 
-        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          onLogin(userData);
+        } else {
+          alert('Giriş başarısız!');
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        // Fallback to hardcoded login for demo
+        if (email === 'admin@rotakalite.com' && password === 'admin123') {
+          onLogin({ 
+            id: 'admin',
+            email, 
+            name: 'ROTA Admin', 
+            role: 'admin',
+            isAdmin: true 
+          });
+        } else {
+          onLogin({ 
+            id: 'customer1',
+            email, 
+            companyName: 'Örnek Otel A.Ş.', 
+            stage: 2,
+            role: 'customer',
+            isAdmin: false 
+          });
+        }
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -224,7 +260,7 @@ const LoginForm = ({ onLogin }) => {
             fontWeight: 'bold'
           }}>R</div>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', margin: '0 0 0.5rem' }}>ROTA CRM</h2>
-          <p style={{ color: '#6b7280', margin: 0 }}>v2.3 - Sürdürülebilir Turizm Sistemi! 🌿</p>
+          <p style={{ color: '#6b7280', margin: 0 }}>v2.4 - MongoDB Gerçek Depolama! 🗄️</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -243,6 +279,7 @@ const LoginForm = ({ onLogin }) => {
                 fontSize: '1rem'
               }}
               required
+              disabled={isLoading}
             />
           </div>
           
@@ -261,34 +298,36 @@ const LoginForm = ({ onLogin }) => {
                 fontSize: '1rem'
               }}
               required
+              disabled={isLoading}
             />
           </div>
 
           <button
             type="submit"
+            disabled={isLoading}
             style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #10b981, #3b82f6)',
+              background: isLoading ? '#9ca3af' : 'linear-gradient(135deg, #10b981, #3b82f6)',
               color: 'white',
               border: 'none',
               padding: '0.75rem',
               borderRadius: '0.5rem',
               fontSize: '1rem',
               fontWeight: '600',
-              cursor: 'pointer'
+              cursor: isLoading ? 'not-allowed' : 'pointer'
             }}
           >
-            Giriş Yap
+            {isLoading ? '🔄 Giriş yapılıyor...' : 'Giriş Yap'}
           </button>
         </form>
 
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
-          <strong>🚀 v2.3 YENİ ÖZELLİKLER:</strong><br/>
+          <strong>🚀 v2.4 YENİ ÖZELLİKLER:</strong><br/>
+          🗄️ MongoDB ile gerçek veritabanı depolaması!<br/>
           🌿 Sürdürülebilir Turizm Yönetim Sistemi!<br/>
-          🗂️ Otomatik klasör yapısı oluşturma!<br/>
-          📁 A, B, C, D sütunları ile organize sistem!<br/>
-          🔄 Hiyerarşik klasör yönetimi!<br/>
-          👤 test@otel.com / 123456<br/>
+          📁 Hiyerarşik klasör yönetimi!<br/>
+          ☁️ Bulut tabanlı dosya saklama!<br/>
+          👤 test@otel.com / herhangi şifre<br/>
           🛡️ admin@rotakalite.com / admin123
         </div>
       </div>
@@ -296,12 +335,14 @@ const LoginForm = ({ onLogin }) => {
   );
 };
 
+// Updated AdminSendFile component with API calls
 const AdminSendFile = ({ customers, onFileUpload }) => {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [category, setCategory] = useState('report');
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [folders, setFolders] = useState([]);
+  const [folderHierarchy, setFolderHierarchy] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -313,28 +354,21 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
   ];
 
   useEffect(() => {
-    if (selectedCustomer) {
-      const customerFolders = getFoldersFromStorage(selectedCustomer);
-      setFolders(customerFolders);
-    }
+    const loadFolders = async () => {
+      if (selectedCustomer) {
+        const customerFolders = await getFoldersFromStorage(selectedCustomer);
+        setFolders(customerFolders);
+        
+        const hierarchy = getFolderHierarchy(customerFolders);
+        setFolderHierarchy(hierarchy);
+      } else {
+        setFolders([]);
+        setFolderHierarchy([]);
+      }
+    };
+    
+    loadFolders();
   }, [selectedCustomer]);
-
-  // Klasör hiyerarşisini düz liste olarak göstermek için
-  const getFolderDisplayName = (folder, allFolders) => {
-    const path = [];
-    let currentFolder = folder;
-    
-    while (currentFolder) {
-      path.unshift(currentFolder.name);
-      currentFolder = allFolders.find(f => f.id === currentFolder.parentId);
-    }
-    
-    // Derinlik seviyesine göre girinti ekle
-    const depth = path.length - 1;
-    const indent = '　'.repeat(depth); // Tam genişlik boşluk karakteri
-    
-    return indent + path[path.length - 1]; // Sadece son klasör adını göster ama girintili
-  };
 
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -356,7 +390,6 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         
-        // ZIP dosyası boyut kontrolü
         const maxSize = file.name.toLowerCase().endsWith('.zip') ? 500 * 1024 * 1024 : 10 * 1024 * 1024;
         if (file.size > maxSize) {
           const maxSizeMB = file.name.toLowerCase().endsWith('.zip') ? 500 : 10;
@@ -382,7 +415,7 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
         onFileUpload();
       }
     } catch (error) {
-      alert('Dosya gönderme hatası!');
+      alert('Dosya gönderme hatası: ' + error.message);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -444,7 +477,7 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
       </div>
 
       {/* Folder Selection */}
-      {selectedCustomer && folders.length > 0 && (
+      {selectedCustomer && folderHierarchy.length > 0 && (
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
             📁 Klasör Seçin (Opsiyonel)
@@ -457,19 +490,35 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
               padding: '0.75rem',
               border: '1px solid #d1d5db',
               borderRadius: '0.5rem',
-              fontSize: '1rem'
+              fontSize: '1rem',
+              fontFamily: 'monospace'
             }}
           >
-            <option value="">Ana klasör</option>
-            {folders.map(folder => {
-              const displayName = getFolderDisplayName(folder, folders);
+            <option value="">📁 Ana klasör</option>
+            {folderHierarchy.map(folder => {
+              const indent = '　'.repeat(folder.depth);
               return (
                 <option key={folder.id} value={folder.id}>
-                  📁 {displayName}
+                  {indent}📁 {folder.name}
                 </option>
               );
             })}
           </select>
+          
+          {selectedFolder && (
+            <div style={{ 
+              marginTop: '0.5rem', 
+              padding: '0.5rem', 
+              background: '#f0f9ff', 
+              borderRadius: '0.25rem',
+              fontSize: '0.875rem',
+              color: '#1e40af'
+            }}>
+              <strong>Seçilen konum:</strong> {
+                folderHierarchy.find(f => f.id === selectedFolder)?.fullPath || 'Ana klasör'
+              }
+            </div>
+          )}
         </div>
       )}
 
@@ -607,50 +656,59 @@ const AdminSendFile = ({ customers, onFileUpload }) => {
   );
 };
 
+// Updated CustomerReceivedFiles component with API calls
 const CustomerReceivedFiles = ({ user }) => {
   const [receivedFiles, setReceivedFiles] = useState([]);
   const [folders, setFolders] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
-  const [breadcrumb, setBreadcrumb] = useState([]);
+  const [folderPath, setFolderPath] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load files sent by admin to this customer
-    const files = getFilesFromStorage(user.id, 'admin', currentFolder);
-    setReceivedFiles(files);
-    
-    // Load folders for this customer
-    const customerFolders = getFoldersFromStorage(user.id, currentFolder);
-    setFolders(customerFolders);
-    
-    // Update breadcrumb
-    updateBreadcrumb(currentFolder);
-  }, [user.id, currentFolder]);
-
-  const updateBreadcrumb = (folderId) => {
-    if (!folderId) {
-      setBreadcrumb([]);
-      return;
-    }
-    
-    const allFolders = getFoldersFromStorage(user.id);
-    const path = [];
-    let currentId = folderId;
-    
-    while (currentId) {
-      const folder = allFolders.find(f => f.id === currentId);
-      if (folder) {
-        path.unshift(folder);
-        currentId = folder.parentId;
-      } else {
-        break;
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [files, customerFolders] = await Promise.all([
+          getFilesFromStorage(user.id, 'admin', currentFolder),
+          getFoldersFromStorage(user.id, currentFolder)
+        ]);
+        
+        setReceivedFiles(files);
+        setFolders(customerFolders);
+        
+        if (currentFolder) {
+          const allFolders = await getFoldersFromStorage(user.id);
+          const path = buildFolderPath(currentFolder, allFolders);
+          setFolderPath(path);
+        } else {
+          setFolderPath([]);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    
-    setBreadcrumb(path);
-  };
+    };
+
+    loadData();
+  }, [user.id, currentFolder]);
 
   const navigateToFolder = (folderId) => {
     setCurrentFolder(folderId);
+  };
+
+  const navigateToParent = () => {
+    if (!currentFolder || folderPath.length === 0) {
+      setCurrentFolder(null);
+      return;
+    }
+    
+    const currentFolderData = folderPath[folderPath.length - 1];
+    if (currentFolderData && currentFolderData.parentId !== undefined) {
+      setCurrentFolder(currentFolderData.parentId);
+    } else {
+      setCurrentFolder(null);
+    }
   };
 
   const getFileIcon = (type) => {
@@ -690,6 +748,15 @@ const CustomerReceivedFiles = ({ user }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  if (isLoading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔄</div>
+        <p>Veriler yükleniyor...</p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: '2rem' }}>
       <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
@@ -699,63 +766,80 @@ const CustomerReceivedFiles = ({ user }) => {
         Danışmanlarımız tarafından size özel hazırlanan belgeler ve raporlar
       </p>
 
-      {/* Breadcrumb & Back Button */}
-      <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <button
-          onClick={() => navigateToFolder(null)}
-          style={{
-            background: currentFolder ? '#f3f4f6' : '#e5e7eb',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '0.5rem',
-            cursor: currentFolder ? 'pointer' : 'not-allowed',
-            fontSize: '0.875rem'
-          }}
-          disabled={!currentFolder}
-        >
-          🏠 Ana Sayfa
-        </button>
-        
-        {/* Bir Üst Klasör Butonu */}
-        {currentFolder && breadcrumb.length > 0 && (
+      {/* Navigation */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
           <button
-            onClick={() => {
-              const parentId = breadcrumb[breadcrumb.length - 1]?.parentId || null;
-              navigateToFolder(parentId);
-            }}
+            onClick={() => navigateToFolder(null)}
             style={{
-              background: '#fef3c7',
+              background: !currentFolder ? '#e5e7eb' : '#f3f4f6',
               border: 'none',
               padding: '0.5rem 1rem',
               borderRadius: '0.5rem',
-              cursor: 'pointer',
+              cursor: !currentFolder ? 'not-allowed' : 'pointer',
               fontSize: '0.875rem',
-              color: '#92400e'
+              fontWeight: !currentFolder ? '600' : '400'
             }}
+            disabled={!currentFolder}
           >
-            ⬆️ Bir Üst Klasör
+            🏠 Ana Sayfa
           </button>
-        )}
-        
-        {breadcrumb.map((folder, index) => (
-          <React.Fragment key={folder.id}>
-            <span style={{ color: '#6b7280' }}>{'>'}</span>
+          
+          {currentFolder && (
             <button
-              onClick={() => navigateToFolder(folder.id)}
+              onClick={navigateToParent}
               style={{
-                background: index === breadcrumb.length - 1 ? '#e5e7eb' : '#f3f4f6',
+                background: '#fef3c7',
                 border: 'none',
                 padding: '0.5rem 1rem',
                 borderRadius: '0.5rem',
-                cursor: index === breadcrumb.length - 1 ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem'
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: '#92400e',
+                fontWeight: '500'
               }}
-              disabled={index === breadcrumb.length - 1}
             >
-              📁 {folder.name}
+              ⬆️ Bir Üst Klasör
             </button>
-          </React.Fragment>
-        ))}
+          )}
+        </div>
+        
+        {/* Breadcrumb Path */}
+        {folderPath.length > 0 && (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem',
+            background: '#f8fafc',
+            padding: '0.5rem 1rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            color: '#64748b'
+          }}>
+            <span>📍 Konum:</span>
+            {folderPath.map((folder, index) => (
+              <React.Fragment key={folder.id}>
+                {index > 0 && <span>{'>'}</span>}
+                <button
+                  onClick={() => navigateToFolder(folder.id)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: index === folderPath.length - 1 ? '#1e40af' : '#64748b',
+                    cursor: index === folderPath.length - 1 ? 'default' : 'pointer',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '0.25rem',
+                    fontSize: '0.875rem',
+                    fontWeight: index === folderPath.length - 1 ? '600' : '400'
+                  }}
+                  disabled={index === folderPath.length - 1}
+                >
+                  📁 {folder.name}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
       </div>
 
       {(receivedFiles.length === 0 && folders.length === 0) ? (
@@ -798,9 +882,12 @@ const CustomerReceivedFiles = ({ user }) => {
                   borderRadius: '0.75rem',
                   marginBottom: '1rem',
                   border: '1px solid #fde68a',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
                 }}
                 onClick={() => navigateToFolder(folder.id)}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#fef3c7'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#fffbeb'}
                 >
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <div style={{
@@ -824,6 +911,7 @@ const CustomerReceivedFiles = ({ user }) => {
                       </p>
                     </div>
                   </div>
+                  <div style={{ fontSize: '1.5rem', color: '#fbbf24' }}>→</div>
                 </div>
               ))}
 
@@ -912,6 +1000,7 @@ const CustomerReceivedFiles = ({ user }) => {
   );
 };
 
+// Updated FileUpload component with API calls
 const FileUpload = ({ user, onFileUpload }) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -922,57 +1011,69 @@ const FileUpload = ({ user, onFileUpload }) => {
   const [currentFolder, setCurrentFolder] = useState(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
-  const [breadcrumb, setBreadcrumb] = useState([]);
+  const [folderPath, setFolderPath] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load customer's own uploaded files in current folder
-    const files = getFilesFromStorage(user.id, 'customer', currentFolder);
-    setUploadedFiles(files);
-    
-    // Load folders for current directory
-    const customerFolders = getFoldersFromStorage(user.id, currentFolder);
-    setFolders(customerFolders);
-    
-    // Update breadcrumb
-    updateBreadcrumb(currentFolder);
-  }, [user.id, currentFolder]);
-
-  const updateBreadcrumb = (folderId) => {
-    if (!folderId) {
-      setBreadcrumb([]);
-      return;
-    }
-    
-    const allFolders = getFoldersFromStorage(user.id);
-    const path = [];
-    let currentId = folderId;
-    
-    while (currentId) {
-      const folder = allFolders.find(f => f.id === currentId);
-      if (folder) {
-        path.unshift(folder);
-        currentId = folder.parentId;
-      } else {
-        break;
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [files, customerFolders] = await Promise.all([
+          getFilesFromStorage(user.id, 'customer', currentFolder),
+          getFoldersFromStorage(user.id, currentFolder)
+        ]);
+        
+        setUploadedFiles(files);
+        setFolders(customerFolders);
+        
+        if (currentFolder) {
+          const allFolders = await getFoldersFromStorage(user.id);
+          const path = buildFolderPath(currentFolder, allFolders);
+          setFolderPath(path);
+        } else {
+          setFolderPath([]);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    
-    setBreadcrumb(path);
-  };
+    };
+
+    loadData();
+  }, [user.id, currentFolder]);
 
   const navigateToFolder = (folderId) => {
     setCurrentFolder(folderId);
   };
 
-  const createNewFolder = () => {
+  const navigateToParent = () => {
+    if (!currentFolder || folderPath.length === 0) {
+      setCurrentFolder(null);
+      return;
+    }
+    
+    const currentFolderData = folderPath[folderPath.length - 1];
+    if (currentFolderData && currentFolderData.parentId !== undefined) {
+      setCurrentFolder(currentFolderData.parentId);
+    } else {
+      setCurrentFolder(null);
+    }
+  };
+
+  const createNewFolder = async () => {
     if (newFolderName.trim()) {
-      saveFolderToStorage(newFolderName.trim(), user.id, currentFolder);
-      setNewFolderName('');
-      setShowNewFolderInput(false);
-      
-      // Refresh folders
-      const customerFolders = getFoldersFromStorage(user.id, currentFolder);
-      setFolders(customerFolders);
+      try {
+        await saveFolderToStorage(newFolderName.trim(), user.id, currentFolder);
+        setNewFolderName('');
+        setShowNewFolderInput(false);
+        
+        // Refresh folders
+        const customerFolders = await getFoldersFromStorage(user.id, currentFolder);
+        setFolders(customerFolders);
+      } catch (error) {
+        alert('Klasör oluşturma hatası: ' + error.message);
+      }
     }
   };
 
@@ -1024,7 +1125,6 @@ const FileUpload = ({ user, onFileUpload }) => {
         return false;
       }
       
-      // ZIP dosyası için 500MB, diğerleri için 10MB
       const maxSize = file.name.toLowerCase().endsWith('.zip') ? 500 * 1024 * 1024 : 10 * 1024 * 1024;
       if (file.size > maxSize) {
         const maxSizeMB = file.name.toLowerCase().endsWith('.zip') ? 500 : 10;
@@ -1064,25 +1164,33 @@ const FileUpload = ({ user, onFileUpload }) => {
         onFileUpload(selectedFiles);
       }
     } catch (error) {
-      alert('Dosya yükleme hatası!');
+      alert('Dosya yükleme hatası: ' + error.message);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
   };
 
-  const handleDeleteFile = (fileId) => {
+  const handleDeleteFile = async (fileId) => {
     if (confirm('Bu dosyayı silmek istediğinizden emin misiniz?')) {
-      deleteFileFromStorage(fileId);
-      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+      try {
+        await deleteFileFromStorage(fileId);
+        setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+      } catch (error) {
+        alert('Dosya silme hatası: ' + error.message);
+      }
     }
   };
 
-  const handleDeleteFolder = (folderId) => {
+  const handleDeleteFolder = async (folderId) => {
     if (confirm('Bu klasörü ve içindeki tüm dosyaları silmek istediğinizden emin misiniz?')) {
-      deleteFolderFromStorage(folderId);
-      setFolders(prev => prev.filter(f => f.id !== folderId));
-      setUploadedFiles(prev => prev.filter(f => f.folderId !== folderId));
+      try {
+        await deleteFolderFromStorage(folderId);
+        setFolders(prev => prev.filter(f => f.id !== folderId));
+        setUploadedFiles(prev => prev.filter(f => f.folderId !== folderId));
+      } catch (error) {
+        alert('Klasör silme hatası: ' + error.message);
+      }
     }
   };
 
@@ -1103,6 +1211,15 @@ const FileUpload = ({ user, onFileUpload }) => {
     return '📎';
   };
 
+  if (isLoading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔄</div>
+        <p>Veriler yükleniyor...</p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '4xl', margin: '0 auto', padding: '2rem' }}>
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>📁 Belge Yükleme</h1>
@@ -1110,64 +1227,81 @@ const FileUpload = ({ user, onFileUpload }) => {
         Danışmanlık süreciniz için gerekli belgeleri yükleyin (ZIP desteği: 500MB'a kadar!)
       </p>
 
-      {/* Breadcrumb & Navigation */}
+      {/* Navigation */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            onClick={() => navigateToFolder(null)}
-            style={{
-              background: currentFolder ? '#f3f4f6' : '#e5e7eb',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              cursor: currentFolder ? 'pointer' : 'not-allowed',
-              fontSize: '0.875rem'
-            }}
-            disabled={!currentFolder}
-          >
-            🏠 Ana Sayfa
-          </button>
-          
-          {/* Bir Üst Klasör Butonu */}
-          {currentFolder && breadcrumb.length > 0 && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <button
-              onClick={() => {
-                const parentId = breadcrumb[breadcrumb.length - 1]?.parentId || null;
-                navigateToFolder(parentId);
-              }}
+              onClick={() => navigateToFolder(null)}
               style={{
-                background: '#fef3c7',
+                background: !currentFolder ? '#e5e7eb' : '#f3f4f6',
                 border: 'none',
                 padding: '0.5rem 1rem',
                 borderRadius: '0.5rem',
-                cursor: 'pointer',
+                cursor: !currentFolder ? 'not-allowed' : 'pointer',
                 fontSize: '0.875rem',
-                color: '#92400e'
+                fontWeight: !currentFolder ? '600' : '400'
               }}
+              disabled={!currentFolder}
             >
-              ⬆️ Bir Üst Klasör
+              🏠 Ana Sayfa
             </button>
-          )}
-          
-          {breadcrumb.map((folder, index) => (
-            <React.Fragment key={folder.id}>
-              <span style={{ color: '#6b7280' }}>{'>'}</span>
+            
+            {currentFolder && (
               <button
-                onClick={() => navigateToFolder(folder.id)}
+                onClick={navigateToParent}
                 style={{
-                  background: index === breadcrumb.length - 1 ? '#e5e7eb' : '#f3f4f6',
+                  background: '#fef3c7',
                   border: 'none',
                   padding: '0.5rem 1rem',
                   borderRadius: '0.5rem',
-                  cursor: index === breadcrumb.length - 1 ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem'
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  color: '#92400e',
+                  fontWeight: '500'
                 }}
-                disabled={index === breadcrumb.length - 1}
               >
-                📁 {folder.name}
+                ⬆️ Bir Üst Klasör
               </button>
-            </React.Fragment>
-          ))}
+            )}
+          </div>
+          
+          {/* Breadcrumb Path */}
+          {folderPath.length > 0 && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.5rem',
+              background: '#f8fafc',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.875rem',
+              color: '#64748b'
+            }}>
+              <span>📍 Konum:</span>
+              {folderPath.map((folder, index) => (
+                <React.Fragment key={folder.id}>
+                  {index > 0 && <span>{'>'}</span>}
+                  <button
+                    onClick={() => navigateToFolder(folder.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: index === folderPath.length - 1 ? '#1e40af' : '#64748b',
+                      cursor: index === folderPath.length - 1 ? 'default' : 'pointer',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.25rem',
+                      fontSize: '0.875rem',
+                      fontWeight: index === folderPath.length - 1 ? '600' : '400'
+                    }}
+                    disabled={index === folderPath.length - 1}
+                  >
+                    📁 {folder.name}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* New Folder Button */}
@@ -1529,17 +1663,33 @@ const AdminDashboard = ({ user, onLogout }) => {
   ]);
 
   useEffect(() => {
-    const files = getFilesFromStorage();
-    setAllFiles(files);
-    const folders = getFoldersFromStorage();
-    setAllFolders(folders);
+    const loadData = async () => {
+      try {
+        const [files, folders] = await Promise.all([
+          getFilesFromStorage(),
+          getFoldersFromStorage()
+        ]);
+        setAllFiles(files);
+        setAllFolders(folders);
+      } catch (error) {
+        console.error('Error loading admin data:', error);
+      }
+    };
+    
+    loadData();
   }, [activeTab]);
 
-  const refreshFiles = () => {
-    const files = getFilesFromStorage();
-    setAllFiles(files);
-    const folders = getFoldersFromStorage();
-    setAllFolders(folders);
+  const refreshFiles = async () => {
+    try {
+      const [files, folders] = await Promise.all([
+        getFilesFromStorage(),
+        getFoldersFromStorage()
+      ]);
+      setAllFiles(files);
+      setAllFolders(folders);
+    } catch (error) {
+      console.error('Error refreshing files:', error);
+    }
   };
 
   const getCustomerName = (userId) => {
@@ -1576,7 +1726,7 @@ const AdminDashboard = ({ user, onLogout }) => {
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
-          🛡️ ROTA <span style={{ color: '#fbbf24' }}>ADMIN v2.3</span>
+          🛡️ ROTA <span style={{ color: '#fbbf24' }}>ADMIN v2.4</span>
         </h1>
         <div>
           <span style={{ marginRight: '1rem' }}>👋 {user.name}</span>
@@ -1695,11 +1845,11 @@ const AdminDashboard = ({ user, onLogout }) => {
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🚀 v2.3 YENİ ÖZELLİKLER!</h3>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🚀 v2.4 YENİ ÖZELLİKLER!</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
                 <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
-                  <strong>🌿 Sürdürülebilir Turizm Sistemi</strong><br/>
-                  <small>Otomatik klasör yapısı oluşturma!</small>
+                  <strong>🗄️ MongoDB Depolaması</strong><br/>
+                  <small>Gerçek veritabanı ile kalıcı veri saklama!</small>
                 </div>
                 <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '0.5rem' }}>
                   <strong>📁 Hiyerarşik Klasör Sistemi</strong><br/>
@@ -1817,10 +1967,14 @@ const AdminDashboard = ({ user, onLogout }) => {
                                 ⬇️ İndir
                               </a>
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   if (confirm('Bu dosyayı silmek istediğinizden emin misiniz?')) {
-                                    deleteFileFromStorage(file.id);
-                                    setAllFiles(prev => prev.filter(f => f.id !== file.id));
+                                    try {
+                                      await deleteFileFromStorage(file.id);
+                                      setAllFiles(prev => prev.filter(f => f.id !== file.id));
+                                    } catch (error) {
+                                      alert('Dosya silme hatası: ' + error.message);
+                                    }
                                   }
                                 }}
                                 style={{
@@ -1929,10 +2083,32 @@ const AdminDashboard = ({ user, onLogout }) => {
 
 const Dashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [customerFileCount, setCustomerFileCount] = useState(0);
+  const [adminFileCount, setAdminFileCount] = useState(0);
+  const [folderCount, setFolderCount] = useState(0);
 
-  // Kullanıcı giriş yaptığında Sürdürülebilir Turizm klasör sistemini oluştur
+  // Kullanıcı giriş yaptığında Sürdürülebilir Turizm klasör sistemini oluştur ve verileri yükle
   useEffect(() => {
-    createSustainableTourismFolders(user.id);
+    const initializeData = async () => {
+      try {
+        await createSustainableTourismFolders(user.id);
+        
+        // Load counts
+        const [customerFiles, adminFiles, folders] = await Promise.all([
+          getFilesFromStorage(user.id, 'customer'),
+          getFilesFromStorage(user.id, 'admin'),
+          getFoldersFromStorage(user.id)
+        ]);
+        
+        setCustomerFileCount(customerFiles.length);
+        setAdminFileCount(adminFiles.length);
+        setFolderCount(folders.length);
+      } catch (error) {
+        console.error('Error initializing dashboard data:', error);
+      }
+    };
+    
+    initializeData();
   }, [user.id]);
 
   return (
@@ -1946,7 +2122,7 @@ const Dashboard = ({ user, onLogout }) => {
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
-          ROTA <span style={{ color: '#10b981' }}>CRM v2.3</span>
+          ROTA <span style={{ color: '#10b981' }}>CRM v2.4</span>
         </h1>
         <div>
           <span style={{ marginRight: '1rem' }}>Hoş geldiniz, {user.companyName}</span>
@@ -2028,7 +2204,7 @@ const Dashboard = ({ user, onLogout }) => {
               }}>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Yüklediğiniz Belgeler</h3>
                 <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
-                  {getFilesFromStorage(user.id, 'customer').length}
+                  {customerFileCount}
                 </p>
               </div>
 
@@ -2041,7 +2217,7 @@ const Dashboard = ({ user, onLogout }) => {
               }}>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Size Özel Belgeler</h3>
                 <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
-                  {getFilesFromStorage(user.id, 'admin').length}
+                  {adminFileCount}
                 </p>
               </div>
 
@@ -2054,7 +2230,7 @@ const Dashboard = ({ user, onLogout }) => {
               }}>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Klasörleriniz</h3>
                 <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
-                  {getFoldersFromStorage(user.id).length}
+                  {folderCount}
                 </p>
               </div>
             </div>
@@ -2065,14 +2241,14 @@ const Dashboard = ({ user, onLogout }) => {
               borderRadius: '0.75rem',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🎉 v2.3 SÜPER GÜNCELLEME!</h3>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>🎉 v2.4 SÜPER GÜNCELLEME!</h3>
               <p style={{ marginBottom: '1rem', color: '#059669', fontWeight: '500' }}>
-                🌿 Sürdürülebilir Turizm Yönetim Sistemi otomatik olarak oluşturuldu!
+                🗄️ MongoDB ile gerçek veritabanı depolaması aktif!
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div style={{ padding: '1rem', background: '#f0fdf4', borderRadius: '0.5rem' }}>
-                  <strong>🌿 Sürdürülebilir Turizm</strong><br/>
-                  <small>A, B, C, D sütunları ile organize sistem!</small>
+                  <strong>🗄️ MongoDB Depolaması</strong><br/>
+                  <small>Kalıcı veri saklama ile güvenli dosya yönetimi!</small>
                 </div>
                 <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '0.5rem' }}>
                   <strong>📁 Otomatik Klasörler</strong><br/>
