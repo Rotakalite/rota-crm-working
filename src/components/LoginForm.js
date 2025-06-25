@@ -11,7 +11,7 @@ const LoginForm = ({ onLogin }) => {
     if (email && password) {
       setIsLoading(true);
       try {
-        const response = await fetch(`${API}/auth/login`, {
+        const response = await fetch('https://rota-crm-working-mz24aeu2m-rotas-projects-62181e6e.vercel.app/api/auth/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
