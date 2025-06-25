@@ -1206,22 +1206,96 @@ const FileUpload = ({ user, onFileUpload }) => {
 
   return (
     <div style={{ maxWidth: '4xl', margin: '0 auto', padding: '2rem' }}>
-      <h1 style={{ fontSize: '2rem', f
-[... Observation truncated due to length ...]
-5rem',
-                      borderRadius: '0.25rem',
-                      fontSize: '0.875rem',
-                      fontWeight: index === folderPath.length - 1 ? '600' : '400'
-                    }}
-                    disabled={index === folderPath.length - 1}
-                  >
-                    📁 {folder.name}
-                  </button>
-                </React.Fragment>
-              ))}
-            </div>
+      <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+        📁 Belge Yönetimi
+      </h1>
+      <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
+        Belgelerinizi yükleyin ve organize edin
+      </p>
+
+      {/* Navigation */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        marginBottom: '1rem',
+        background: 'white',
+        padding: '1rem',
+        borderRadius: '0.5rem',
+        boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button
+            onClick={() => navigateToFolder(null)}
+            style={{
+              background: !currentFolder ? '#e5e7eb' : '#f3f4f6',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              cursor: !currentFolder ? 'not-allowed' : 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: !currentFolder ? '600' : '400'
+            }}
+            disabled={!currentFolder}
+          >
+            🏠 Ana Sayfa
+          </button>
+          
+          {currentFolder && (
+            <button
+              onClick={navigateToParent}
+              style={{
+                background: '#fef3c7',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: '#92400e',
+                fontWeight: '500'
+              }}
+            >
+              ⬆️ Bir Üst Klasör
+            </button>
           )}
         </div>
+
+        {/* Breadcrumb Path */}
+        {folderPath.length > 0 && (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem',
+            background: '#f8fafc',
+            padding: '0.5rem 1rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            color: '#64748b'
+          }}>
+            <span>📍 Konum:</span>
+            {folderPath.map((folder, index) => (
+              <React.Fragment key={folder.id}>
+                {index > 0 && <span>{'>'}</span>}
+                <button
+                  onClick={() => navigateToFolder(folder.id)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: index === folderPath.length - 1 ? '#1e40af' : '#64748b',
+                    cursor: index === folderPath.length - 1 ? 'default' : 'pointer',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '0.25rem',
+                    fontSize: '0.875rem',
+                    fontWeight: index === folderPath.length - 1 ? '600' : '400'
+                  }}
+                  disabled={index === folderPath.length - 1}
+                >
+                  📁 {folder.name}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
 
         {/* New Folder Button */}
         <button
