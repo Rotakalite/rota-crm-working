@@ -1,6 +1,6 @@
 // API Configuration and utility functions
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = 'https://rota-crm-working-mz24aeu2m-rotas-projects-62181e6e.vercel.app';
 const API = `${BACKEND_URL}/api`;
 
 // API utility functions
