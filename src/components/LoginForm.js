@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { API } from '../utils/api';
 
 const LoginForm = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -7,34 +6,34 @@ const LoginForm = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (email && password) {
-    setIsLoading(true);
-    
-    // Mock authentication without API
-    setTimeout(() => {
-      if (email === 'admin@rotakalite.com' && password === 'admin123') {
-        onLogin({
-          id: 'admin',
-          email,
-          name: 'ROTA Admin',
-          role: 'admin',
-          isAdmin: true
-        });
-      } else {
-        onLogin({
-          id: 'customer1',
-          email,
-          companyName: 'Örnek Otel A.Ş.',
-          stage: 2,
-          role: 'customer',
-          isAdmin: false
-        });
-      }
-      setIsLoading(false);
-    }, 1000);
-  }
-};
+    e.preventDefault();
+    if (email && password) {
+      setIsLoading(true);
+      
+      // Mock authentication
+      setTimeout(() => {
+        if (email === 'admin@rotakalite.com' && password === 'admin123') {
+          onLogin({
+            id: 'admin',
+            email,
+            name: 'ROTA Admin',
+            role: 'admin',
+            isAdmin: true
+          });
+        } else {
+          onLogin({
+            id: 'customer1',
+            email,
+            companyName: 'Örnek Otel A.Ş.',
+            stage: 2,
+            role: 'customer',
+            isAdmin: false
+          });
+        }
+        setIsLoading(false);
+      }, 1000);
+    }
+  };
 
   return (
     <div style={{
@@ -130,11 +129,9 @@ const LoginForm = ({ onLogin }) => {
         </form>
 
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
-          <strong>🚀 Sürdürülebilir Turizm Sistemi:</strong><br/>
-          🗄️ MongoDB ile gerçek veritabanı depolaması!<br/>
+          <strong>🚀 Mock Authentication:</strong><br/>
+          ✅ API olmadan çalışır!<br/>
           🌿 A,B,C,D sütunları ile organize klasör sistemi!<br/>
-          📁 Otomatik hiyerarşik klasör yönetimi!<br/>
-          ☁️ Bulut tabanlı dosya saklama!<br/>
           👤 test@otel.com / herhangi şifre<br/>
           🛡️ admin@rotakalite.com / admin123
         </div>
