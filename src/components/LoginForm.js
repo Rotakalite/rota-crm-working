@@ -7,32 +7,34 @@ const LoginForm = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (email && password) {
-      setIsLoading(true);
-      try {
-        const response = await fetch('https://rota-crm-working-mz24aeu2m-rotas-projects-62181e6e.vercel.app/api/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password })
+  e.preventDefault();
+  if (email && password) {
+    setIsLoading(true);
+    
+    // Mock authentication without API
+    setTimeout(() => {
+      if (email === 'admin@rotakalite.com' && password === 'admin123') {
+        onLogin({
+          id: 'admin',
+          email,
+          name: 'ROTA Admin',
+          role: 'admin',
+          isAdmin: true
         });
-
-        if (response.ok) {
-          const userData = await response.json();
-          onLogin(userData);
-        } else {
-          alert('Giriş başarısız!');
-        }
-      } catch (error) {
-        console.error('Login error:', error);
-        alert('Giriş sırasında bir hata oluştu!');
-      } finally {
-        setIsLoading(false);
+      } else {
+        onLogin({
+          id: 'customer1',
+          email,
+          companyName: 'Örnek Otel A.Ş.',
+          stage: 2,
+          role: 'customer',
+          isAdmin: false
+        });
       }
-    }
-  };
+      setIsLoading(false);
+    }, 1000);
+  }
+};
 
   return (
     <div style={{
